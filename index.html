@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPHEREx Time-Lapse</title>
+  <meta name="description" content="Watch the sky change in NASA SPHEREx images: time-lapse, blink and difference views of any spot on the sky.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2315171b' stroke='%23e8e9eb' stroke-width='2'/%3E%3Ccircle cx='11' cy='13' r='2' fill='%23a0a4ad'/%3E%3Ccircle cx='20' cy='19' r='3' fill='%23f7f7f7'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=30">
+</head>
+<body>
+  <div class="starfield" id="starfield" aria-hidden="true"></div>
+  <header class="top">
+    <div class="observatory-dock">
+      <div class="dock-atmosphere" aria-hidden="true">
+        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none">
+          <path d="M-20 94C190-28 390 125 660 55S1000 2 1220 66" stroke="currentColor" stroke-opacity=".28"/>
+          <path d="M-20 62C240 146 360-30 690 45S1030 125 1220 24" stroke="currentColor" stroke-opacity=".13"/>
+          <circle cx="260" cy="51" r="2" fill="currentColor"/><circle cx="824" cy="30" r="1.5" fill="currentColor"/><circle cx="1080" cy="72" r="2" fill="currentColor"/>
+        </svg>
+      </div>
+      <a class="brand" href="./" aria-label="SPHEREx Time-Lapse home">
+        <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <circle cx="24" cy="24" r="21" stroke="currentColor" stroke-opacity=".5" stroke-dasharray="27 17" transform="rotate(-25 24 24)"/>
+          <circle cx="24" cy="24" r="15" stroke="currentColor" stroke-opacity=".35"/>
+          <path d="m24 10 3.5 10.5L38 24l-10.5 3.5L24 38l-3.5-10.5L10 24l10.5-3.5Z" fill="currentColor"/>
+          <circle cx="24" cy="24" r="3" fill="#11151b"/>
+        </svg>
+        <span><span class="title">SPHEREx</span><span class="tag">See the sky change</span></span>
+      </a>
+      <form id="search" class="search" autocomplete="off">
+        <div class="finder-mode">
+          <label for="searchMode">Explore</label>
+          <select id="searchMode">
+            <option value="place">Stars &amp; sky</option>
+            <option value="track">Comets &amp; asteroids</option>
+          </select>
+        </div>
+        <div class="finder-query">
+          <label for="q">Find a target</label>
+          <input id="q" name="q" type="search" placeholder="Try Orion Nebula or sky coordinates" required>
+        </div>
+        <button type="submit" class="finder-submit" aria-label="Explore target"><span>Explore</span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14" stroke="currentColor" stroke-width="1.7"/></svg></button>
+      </form>
+      <div class="dock-tools" role="group" aria-label="Help and settings">
+        <button type="button" class="dock-tool dock-guide" data-scroll-target="about" aria-label="Quick start guide" title="Quick start guide"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.4"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Quick start</span></button>
+        <button id="settingsBtn" type="button" class="dock-tool" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true"><path d="M5 4v16M12 4v16M19 4v16" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4"/><path d="M2 9h6M9 16h6M16 7h6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <section id="intro" class="intro">
+    <div class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow"><span aria-hidden="true"></span> THE SKY, THROUGH TIME</p>
+        <h1>Watch the sky.<br><span>Spot what changes.</span></h1>
+        <p class="intro-lead">Explore real SPHEREx images. Move through the dates.
+          See what looks different.</p>
+        <div class="hero-actions">
+          <button type="button" class="hero-primary" data-scroll-target="destinations-heading">Choose a target <span aria-hidden="true">↘</span></button>
+          <button type="button" class="hero-secondary" data-scroll-target="q">Search the sky <span aria-hidden="true">↗</span></button>
+        </div>
+      </div>
+      <figure class="hero-demo" id="motionDemo" aria-labelledby="demo-title" aria-describedby="demo-description">
+        <figcaption><span class="section-kicker">TRY IT HERE</span><h2 id="demo-title">Can you spot what moved?</h2><p class="demo-disclaimer">Simulated example · not real sky data</p></figcaption>
+        <div class="demo-scene" aria-hidden="true">
+          <svg class="demo-image" viewBox="0 0 400 320">
+            <defs>
+              <g id="demo-stars" fill="#dbe1ea">
+                <circle cx="32" cy="52" r="1.5"/><circle cx="77" cy="103" r="2.5"/><circle cx="118" cy="44" r="1"/>
+                <circle cx="158" cy="76" r="2"/><circle cx="224" cy="38" r="1.5"/><circle cx="275" cy="71" r="3"/>
+                <circle cx="347" cy="38" r="1"/><circle cx="368" cy="113" r="2"/><circle cx="307" cy="132" r="1"/>
+                <circle cx="217" cy="119" r="2"/><circle cx="48" cy="166" r="1"/><circle cx="94" cy="225" r="3"/>
+                <circle cx="43" cy="273" r="2"/><circle cx="173" cy="205" r="1.5"/><circle cx="142" cy="275" r="1"/>
+                <circle cx="229" cy="258" r="2"/><circle cx="322" cy="257" r="2.5"/><circle cx="371" cy="212" r="1.5"/>
+                <circle cx="194" cy="301" r="1"/><circle cx="347" cy="295" r="1"/><circle cx="108" cy="159" r="1"/>
+              </g>
+            </defs>
+            <use href="#demo-stars"/>
+            <circle class="demo-moving-point" cx="282" cy="202" r="4"/>
+            <circle class="demo-answer" cx="282" cy="202" r="16"/>
+          </svg>
+          <div class="demo-before">
+            <svg class="demo-image" viewBox="0 0 400 320">
+              <use href="#demo-stars"/>
+              <circle class="demo-moving-point" cx="130" cy="145" r="4"/>
+              <circle class="demo-answer" cx="130" cy="145" r="16"/>
+            </svg>
+          </div>
+          <span class="demo-epoch demo-epoch-before">BEFORE</span><span class="demo-epoch demo-epoch-after">AFTER</span>
+          <span class="demo-divider"><span>↔</span></span>
+        </div>
+        <label class="demo-slider-label" for="demoSlider">Drag the line or use the slider to compare</label>
+        <input id="demoSlider" class="demo-slider" type="range" min="0" max="100" value="50" aria-describedby="demo-description">
+        <div class="demo-footer"><p id="demo-description">The stars stay put. One dot changes position.</p><button id="demoReveal" type="button" aria-pressed="false">Show me</button></div>
+      </figure>
+    </div>
+    <div class="examples-heading destinations-heading" id="destinations-heading" tabindex="-1">
+      <div><p class="section-kicker">YOUR FIRST STOP</p><h2>Where do you want to go?</h2></div>
+      <p>Pick something that catches your curiosity.</p>
+    </div>
+    <div class="destinations" id="featuredExamples"></div>
+    <details class="more-targets">
+      <summary>More places and objects</summary>
+      <div class="examples" id="examples"></div>
+    </details>
+    <div class="examples-heading other-heading" id="challenge-heading" tabindex="-1">
+      <div><p class="section-kicker">TAKE A CLOSER LOOK</p><h2>Five challenge targets</h2></div>
+      <p>These use fixed sky positions. Fast-moving targets may shift between dates.</p>
+    </div>
+    <div class="examples" id="challengeExamples"></div>
+    <p class="stats mono" id="stats"></p>
+  </section>
+
+  <main id="workspace" class="workspace" hidden>
+    <aside class="panel" id="image-controls" tabindex="-1" aria-label="View controls">
+      <div class="target">
+        <svg class="target-orbit" viewBox="0 0 64 64" fill="none" aria-hidden="true"><circle cx="32" cy="32" r="23" stroke="currentColor" stroke-opacity=".3"/><ellipse cx="32" cy="32" rx="29" ry="12" transform="rotate(-35 32 32)" stroke="currentColor" stroke-opacity=".6"/><circle cx="32" cy="32" r="4" fill="currentColor"/><circle cx="53" cy="16" r="2" fill="currentColor"/></svg>
+        <p class="section-kicker">YOU'RE EXPLORING</p>
+        <h2 class="target-name" id="targetName">-</h2>
+        <div class="target-coords mono" id="targetCoords"></div>
+        <p class="hint" id="trackNote" hidden></p>
+        <div class="target-guide" id="targetGuide" hidden></div>
+      </div>
+
+      <fieldset class="control-section">
+        <legend><span class="control-step">01</span> Choose your view</legend>
+        <div class="modes" id="modes" role="group" aria-label="View mode">
+          <button type="button" data-mode="play"><span class="view-symbol" aria-hidden="true">▶</span><span class="view-copy"><strong>Time-lapse</strong><small>Visits in order</small></span></button>
+          <button type="button" data-mode="blink"><span class="view-symbol" aria-hidden="true">◐</span><span class="view-copy"><strong>Blink</strong><small>Flip two dates</small></span></button>
+          <button type="button" data-mode="compare"><span class="view-symbol" aria-hidden="true">±</span><span class="view-copy"><strong>A/B residual</strong><small>Two dates, with quality checks</small></span></button>
+          <button type="button" data-mode="diff"><span class="view-symbol" aria-hidden="true">Δ</span><span class="view-copy"><strong>Difference</strong><small>Compare with a combined view</small></span></button>
+          <button type="button" data-mode="motion"><span class="view-symbol" aria-hidden="true">✦</span><span class="view-copy"><strong>Motion trail</strong><small>Colour residual light by date</small></span></button>
+          <button type="button" data-mode="static"><span class="view-symbol" aria-hidden="true">▤</span><span class="view-copy"><strong>Deep stack</strong><small>Combine visits in one image</small></span></button>
+        </div>
+        <p class="hint mode-guide" id="modeHint" aria-live="polite"></p>
+      </fieldset>
+
+      <fieldset class="control-section">
+        <legend><span class="control-step">02</span> Pick an infrared band</legend>
+        <p class="control-intro">Each band shows a different slice of infrared light.</p>
+        <div class="bands" id="bands" role="group" aria-label="Infrared detector band"></div>
+        <div class="band-info" id="bandInfo" aria-live="polite"></div>
+        <form class="wavelength-window" id="waveForm">
+          <label for="waveMin">Wavelength window <span class="hint">(micrometres)</span></label>
+          <div class="window-inputs">
+            <input id="waveMin" type="number" min="0.75" max="5" step="any" value="0.75" aria-label="Minimum wavelength in micrometres" required>
+            <span>to</span>
+            <input id="waveMax" type="number" min="0.75" max="5" step="any" value="5" aria-label="Maximum wavelength in micrometres" required>
+          </div>
+          <div class="window-actions"><button type="submit" class="control-jump">Apply window</button><button type="button" class="control-jump" id="waveClear">All wavelengths</button></div>
+          <p class="hint" id="waveStatus" role="status">No wavelength filter. D1-D6 are detector ranges, not 102 separate channels.</p>
+        </form>
+      </fieldset>
+
+      <fieldset class="control-section">
+        <legend><span class="control-step">03</span> How much sky?</legend>
+        <div class="seg" id="sizes" role="group" aria-label="Field of view">
+          <button type="button" data-size="48" aria-label="5 arcminute field, close view"><strong>5′</strong><small>Close</small></button>
+          <button type="button" data-size="96" aria-label="10 arcminute field, medium view"><strong>10′</strong><small>Medium</small></button>
+          <button type="button" data-size="160" aria-label="16 arcminute field, wide view"><strong>16′</strong><small>Wide</small></button>
+          <button type="button" data-size="240" aria-label="25 arcminute field, widest view"><strong>25′</strong><small>Widest</small></button>
+        </div>
+        <p class="hint">A wider view shows more of the sky.</p>
+      </fieldset>
+
+      <details class="advanced-settings">
+        <summary><span>Adjust the image<small>Appearance, clean-up &amp; overlays</small></span></summary>
+      <fieldset>
+        <legend>Prepare the images</legend>
+        <label class="check"><input type="checkbox" id="groupDay" checked><span>Combine same-day images<small>Turn off to inspect individual exposures.</small></span></label>
+        <label class="check"><input type="checkbox" id="mask" checked><span>Hide flagged pixels<small>Display only. Analysis uses stricter checks.</small></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>Brightness &amp; colour</legend>
+        <label class="row">Brightness curve
+          <select id="stretch">
+            <option value="asinh">asinh</option>
+            <option value="sqrt">square root</option>
+            <option value="log">log</option>
+            <option value="linear">linear</option>
+          </select>
+        </label>
+        <label class="row">Colours
+          <select id="cmap">
+            <option value="gray">grayscale</option>
+            <option value="infrared">infrared</option>
+            <option value="ice">ice</option>
+          </select>
+        </label>
+        <label class="row">Contrast <input type="range" id="contrast" min="0.9" max="0.9995" step="0.0005" value="0.998"></label>
+        <label class="check"><input type="checkbox" id="invert"> Invert image colours</label>
+      </fieldset>
+      <fieldset>
+        <legend>On-image guides</legend>
+        <label class="check"><input type="checkbox" id="crosshair" checked> Show target marker</label>
+        <label class="check"><input type="checkbox" id="asteroids"> Label known asteroids</label>
+        <label class="row">Catalog context
+          <select id="contextCatalog">
+            <option value="none">None</option>
+            <option value="gaia">Gaia DR3</option>
+            <option value="wise">AllWISE</option>
+          </select>
+        </label>
+        <button type="button" class="control-jump" id="contextRetry" hidden>Retry catalog</button>
+        <label class="row">Asteroids brighter than
+          <select id="astMag">
+            <option value="16">V 16</option>
+            <option value="18">V 18</option>
+            <option value="20" selected>V 20</option>
+            <option value="22">V 22</option>
+          </select>
+        </label>
+      </fieldset>
+      </details>
+      <button type="button" class="rail-return control-jump" data-scroll-target="viewer">Back to the image <span aria-hidden="true">↗</span></button>
+    </aside>
+
+    <section class="stage">
+      <div class="stage-heading"><div><span class="section-kicker">OBSERVATION / ARCHIVE VIEW</span><h2>Image viewer</h2></div><div class="viewer-actions"><button type="button" class="control-jump" id="fullscreenBtn" aria-controls="viewer">Full screen</button><button type="button" class="control-jump" data-scroll-target="viewer">Fit image</button></div></div>
+      <div class="viewer" id="viewer" tabindex="-1">
+        <div class="image-surface" id="imageSurface">
+          <canvas id="canvas" width="96" height="96" role="img" aria-label="SPHEREx image"></canvas>
+          <svg class="overlay" id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <canvas class="quality-overlay" id="qualityOverlay" aria-hidden="true"></canvas>
+          <div class="hud hud-tl mono" id="hudDate"></div>
+          <div class="hud hud-tr mono" id="hudFrame"></div>
+          <div class="hud hud-bl mono" id="hudCursor"></div>
+          <div class="hud hud-br" id="compass" aria-hidden="true">
+            <svg viewBox="0 0 60 60" width="60" height="60"><path d="M50 50 V14 M50 50 H14" stroke="currentColor" stroke-width="2" fill="none"/><text x="50" y="10" text-anchor="middle">N</text><text x="7" y="54" text-anchor="middle">E</text></svg>
+          </div>
+          <div class="loading" id="loading" hidden><div class="spinner"></div><div id="loadingText" role="status" aria-live="polite">Searching the archive…</div></div>
+        </div>
+        <div class="fullscreen-controls" role="group" aria-label="Full screen image controls">
+          <button type="button" class="icon-btn" id="fullscreenPrev" aria-label="Previous frame">‹</button>
+          <button type="button" class="control-jump" id="fullscreenPlay">Play</button>
+          <button type="button" class="icon-btn" id="fullscreenNext" aria-label="Next frame">›</button>
+          <button type="button" class="control-jump" id="fullscreenExit">Exit full screen</button>
+        </div>
+      </div>
+
+      <p class="ast-note" id="astNote"></p>
+      <p class="hint" id="contextNote" role="status"></p>
+      <p class="hint" id="qualityNote" role="status" aria-live="polite"></p>
+      <p class="hint" id="restoreNote" role="status"></p>
+      <p class="viewer-caveat">Exploratory views are not calibrated detections. Check quality and wavelength before interpreting changes.</p>
+      <div class="transport">
+        <button id="playBtn" class="play" aria-label="Play">
+          <svg viewBox="0 0 24 24" width="22" height="22" class="i-play"><path fill="currentColor" d="M7 5v14l12-7z"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" class="i-pause"><path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+        </button>
+        <button id="prevBtn" class="icon-btn" aria-label="Previous frame">‹</button>
+        <button id="nextBtn" class="icon-btn" aria-label="Next frame">›</button>
+        <label class="speed">Speed <input type="range" id="speed" min="1" max="12" value="4"> <span id="speedVal" class="mono">4 fps</span></label>
+        <div class="progress" id="progress"><div id="progressBar"></div></div>
+        <button id="pngBtn" class="text-btn" title="Save the current view as a PNG">PNG</button>
+        <button id="videoBtn" class="text-btn" title="Save the time-lapse as a video">Video</button>
+      </div>
+
+      <div class="timeline-heading"><span class="section-kicker">OBSERVATION TIMELINE</span><span>Choose a date below</span></div>
+      <div class="timeline" id="timeline" aria-label="Observation timeline; use the date buttons below to select frames">
+        <div class="axis" id="axis"></div>
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <div class="blink-pick" id="blinkPick" hidden>
+        <span class="pick-label">Select a date for</span>
+        <button type="button" data-pick="A" aria-pressed="true">A <strong id="blinkA"></strong></button>
+        <button type="button" data-pick="B" aria-pressed="false">B <strong id="blinkB"></strong></button>
+        <span class="hint">Choose A or B, then select a date on the timeline or filmstrip.</span>
+      </div>
+
+      <div class="filmstrip" id="filmstrip"></div>
+      <details class="observation-details" id="qualityInspector">
+        <summary>Inspect image quality &amp; source files</summary>
+        <p class="hint">Orange marks pixels rejected by conservative native-support checks, including image edges. SOURCE (bit 21) is retained for science but excluded from background estimation.</p>
+        <label class="check"><input type="checkbox" id="qualityMask"> Show rejected-pixel overlay</label>
+        <div id="qualityDetails"></div>
+      </details>
+      <div class="observation-actions">
+        <button type="button" class="control-jump" id="shareView">Copy view link</button>
+        <button type="button" class="control-jump" id="exportObservation">Export observation JSON</button>
+      </div>
+      <details class="observation-details" id="archiveDetails">
+        <summary>Archive releases &amp; freshness</summary>
+        <p class="hint" id="archiveStatus" role="status">Loading index provenance...</p>
+        <p class="hint">An index footprint is not guaranteed usable coverage. Local updates do not automatically publish a new public deployment.</p>
+      </details>
+      <details class="observation-details">
+        <summary>Catalog source details</summary>
+        <div id="contextDetails">Choose Gaia DR3 or AllWISE under Adjust the image to show catalog markers.</div>
+      </details>
+
+      <section class="changes" id="changes">
+        <div class="lc-head">
+          <div>
+            <h3>Changes found</h3>
+            <p class="hint" id="chSummary" aria-live="polite">Exploratory scan requires compatible wavelengths and common quality-valid, source-free support.</p>
+          </div>
+          <button id="scanBtn" class="text-btn primary">Scan for changes</button>
+          <button type="button" id="candidateCsv" class="text-btn" disabled>Candidate CSV</button>
+        </div>
+        <div class="ch-filters" id="chFilters" hidden>
+          <button data-f="moving" aria-pressed="false">Moving objects</button>
+          <button data-f="unknown" aria-pressed="true">Unidentified</button>
+          <button data-f="known" aria-pressed="false">Known asteroids</button>
+          <button data-f="brightened" aria-pressed="false">Brightened</button>
+          <button data-f="glitch" aria-pressed="false">Glitches</button>
+          <button data-f="all" aria-pressed="false">All</button>
+        </div>
+        <ol class="ch-list" id="chList"></ol>
+      </section>
+
+      <p class="hint lc-invite" id="lcInvite">Tip: click any star in the image to plot its brightness over time.</p>
+      <section class="lightcurve" id="lc" hidden>
+        <div class="lc-head">
+          <div>
+            <h3 id="lcTitle">Brightness over time</h3>
+            <p class="hint" id="lcWhere"></p>
+            <div class="lc-tabs" id="lcTabs" role="tablist">
+              <button data-v="time" role="tab" aria-selected="true">Over time</button>
+              <button data-v="spectrum" role="tab" aria-selected="false">Spectrum (all bands)</button>
+            </div>
+          </div>
+          <div class="lc-actions">
+            <button id="lcCsv" class="text-btn">CSV</button>
+            <button id="lcClear" class="text-btn">Clear</button>
+          </div>
+        </div>
+        <div class="lc-wrap">
+          <svg id="lcSvg" role="img" aria-label="Brightness of the selected star at each visit"></svg>
+          <div class="lc-tip mono" id="lcTip" hidden></div>
+        </div>
+        <p class="lc-note" id="lcNote" aria-live="polite"></p>
+        <label class="check" id="colourRow"><input type="checkbox" id="colourFix" checked> Correct for filter colour</label>
+        <p class="hint" id="lcCaveat"></p>
+      </section>
+    </section>
+  </main>
+
+  <section class="about" id="about" tabindex="-1" aria-labelledby="field-guide-title">
+    <details class="observation-details" id="challengeChecks">
+      <summary>Five challenge targets: guides &amp; live checks</summary>
+      <p class="hint">Checks sample up to three dates per target for real cutouts, FLAGS, wavelengths and guarded comparison support. They do not establish motion, variability or a discovery. Each target still needs manual inspection.</p>
+      <div id="challengeGuides"></div>
+      <div class="observation-actions"><button type="button" id="runChecks" class="control-jump">Run five target checks</button><button type="button" id="cancelChecks" class="control-jump" hidden>Cancel checks</button><button type="button" id="exportChecks" class="control-jump" disabled>Export check results</button></div>
+      <p class="hint" id="checksStatus" role="status">Not run in this session. These checks download archive cutouts.</p>
+      <ol class="check-results" id="checkResults"></ol>
+    </details>
+    <div class="field-guide-heading">
+      <div><p class="section-kicker">NO ASTRONOMY EXPERIENCE NEEDED</p><h2 id="field-guide-title">Choose. Play. Compare.</h2></div>
+      <p>Start with these three steps.</p>
+    </div>
+    <ol class="guide-steps">
+      <li><span class="guide-number" aria-hidden="true">01</span><h3>Choose a place</h3><p>Try a target above, or search for an object by name or sky coordinates.</p></li>
+      <li><span class="guide-number" aria-hidden="true">02</span><h3>Press play</h3><p>Watch the images in date order. Pause or use the arrows to go one image at a time.</p></li>
+      <li><span class="guide-number" aria-hidden="true">03</span><h3>Compare two dates</h3><p>Choose Blink, then pick dates A and B. The view flips between them so differences are easier to see.</p></li>
+    </ol>
+    <p class="science-note">A change on screen is a clue, not a discovery. Different wavelengths, image defects, and alignment can also make things look different.</p>
+    <details class="tool-guide">
+      <summary>What do the other tools do?</summary>
+      <dl>
+        <div><dt>A/B residual</dt><dd>Shows the difference between two dates after quality and wavelength checks. It is a rough comparison, not a precise measurement.</dd></div>
+        <div><dt>Difference</dt><dd>Compares each image with a combined view of the visits. Different wavelengths can leave misleading bright or dark patches.</dd></div>
+        <div><dt>Scan for changes</dt><dd>Finds possible changes in suitable images. Image defects can look like real objects, so every result needs checking.</dd></div>
+        <div><dt>Spectrum</dt><dd>Click a star, then choose Spectrum to see how bright it looks at different infrared wavelengths. Measurements are approximate.</dd></div>
+        <div><dt>Motion trail</dt><dd>Colours leftover light by date. A moving object may leave a coloured trail, but image defects can too.</dd></div>
+        <div><dt>Deep stack</dt><dd>Combines visits into one view. It can mix wavelengths, so use it to explore rather than make precise measurements.</dd></div>
+      </dl>
+    </details>
+    <details class="data-notes">
+      <summary>Where do these images come from?</summary>
+      <p class="fine">NASA/JPL-Caltech SPHEREx Quick Release images, served by <a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">NASA/IPAC IRSA</a>. The six detectors cover infrared wavelengths from 0.75 to 5 µm. An object's brightness can look different simply because the wavelength changed between visits. These views do not provide calibrated photometry or confirmed detections.</p>
+      <p class="fine">Name lookup: <a href="https://cds.unistra.fr/">CDS Sesame</a>. Orbits: <a href="https://ssd.jpl.nasa.gov/horizons/">JPL Horizons</a> and <a href="https://ssp.imcce.fr/webservices/">IMCCE</a>. Not an official NASA product. <a href="https://github.com/ShivenKhurana1/spherex-timelapse">Source on GitHub</a>.</p>
+    </details>
+  </section>
+
+  <dialog id="settings">
+    <form method="dialog">
+      <h2>Settings</h2>
+      <label>Maximum frames to load
+        <input id="maxFrames" type="number" min="4" max="400" value="80">
+      </label>
+      <div class="dialog-actions"><button value="cancel">Cancel</button><button value="save" class="primary">Save</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/app.js?v=30"></script>
+  <script type="module" src="js/ui-effects.js?v=30"></script>
+</body>
+</html>
