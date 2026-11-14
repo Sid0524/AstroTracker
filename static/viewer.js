@@ -1,7 +1,12 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const samples = { barnard: [269.446268, 4.768204], wise: [133.7951292, -7.2451472] };
+const MAX_SELECTED = 32;    // frames are ~90 KB each once aligned
+const LOAD_CONCURRENCY = 4; // cutouts fetched in parallel
+// WISE 0855 moves ~8 arcsec/yr west; by 2025-26 it is ~2 arcmin from the
+// challenge's reference position (see docs/VERIFICATION.md), so the default
+// sample uses a CatWISE2020-propagated 2026.0 position.
+const samples = { barnard: [269.446268, 4.768204], wise: [133.75947, -7.242557], wiseref: [133.7951292, -7.2451472] };
 const state = { search: null, selected: new Set(), frames: [], current: 0, a: 0, b: 1, timer: null, busy: false, generation: 0 };
 const bandLabels = { "SPHEREx-D1": "D1 / 0.75-1.09 um", "SPHEREx-D2": "D2 / 1.10-1.62 um", "SPHEREx-D3": "D3 / 1.63-2.41 um", "SPHEREx-D4": "D4 / 2.42-3.82 um", "SPHEREx-D5": "D5 / 3.83-4.41 um", "SPHEREx-D6": "D6 / 4.42-5.00 um" };
 
@@ -30,6 +35,40 @@ function setBusy(busy) {
   $("suggest").disabled = busy || !state.search?.records.length;
   $("load").disabled = busy || !state.selected.size;
   $("records").querySelectorAll("input, button").forEach((el) => { el.disabled = busy; });
+  drawTimeline();
+}
+
+function drawTimeline() {
+  ObservationTimeline.render($("coverage"), {
+    search: state.search,
+    band: state.search?.records.length ? $("band").value : null,
+    selected: state.selected,
+    loaded: new Set(state.frames.map((f) => f.record.id)),
+    busy: state.busy,
+    onPick: pickFromTimeline,
+  });
+}
+
+function pickFromTimeline(group) {
+  if (state.busy) return;
+  const ids = group.records.map((r) => r.id);
+  if (group.band !== $("band").value) {
+    // Comparisons stay within one detector, so switching rows switches band.
+    $("band").value = group.band;
+    clearFrames();
+    state.selected.clear();
+  }
+  const already = ids.filter((id) => state.selected.has(id));
+  if (already.length) {
+    already.forEach((id) => state.selected.delete(id));
+    status(`Deselected ${group.day} ${group.band.replace("SPHEREx-", "")}.`);
+  } else if (state.selected.size >= MAX_SELECTED) {
+    status(`Choose at most ${MAX_SELECTED} cutouts. Deselect an exposure first.`, true);
+  } else {
+    state.selected.add(ids[0]);
+    status(`Selected the first of ${ids.length} ${group.band.replace("SPHEREx-", "")} exposure${ids.length > 1 ? "s" : ""} on ${group.day}. Click Load selected to fetch it.`);
+  }
+  renderTable();
 }
 
 function filtered() {
@@ -73,6 +112,7 @@ function updateSelection() {
   const rows = filtered();
   const dates = new Set(rows.map((r) => r.date.slice(0, 10)));
   $("selection-summary").textContent = `${rows.length} exposures / ${dates.size} calendar dates / ${state.selected.size} selected`;
+  drawTimeline();
 }
 
 function cell(row, value) {
@@ -103,9 +143,9 @@ function renderTable() {
     check.disabled = state.busy;
     check.setAttribute("aria-label", `Select ${record.date} ${record.release} ${record.observation}`);
     check.addEventListener("change", () => {
-      if (check.checked && state.selected.size >= 8) {
+      if (check.checked && state.selected.size >= MAX_SELECTED) {
         check.checked = false;
-        status("Choose at most 8 cutouts. Deselect an exposure first.", true);
+        status(`Choose at most ${MAX_SELECTED} cutouts. Deselect an exposure first.`, true);
         return;
       }
       if (check.checked) state.selected.add(record.id);
@@ -200,7 +240,7 @@ function draw() {
   $("scale").textContent = `${state.search.fov_arcmin} arcmin full width`;
   $("timeline").value = String(state.current);
   const wave = frame.wavelength_um === null ? "unavailable (target outside finite footprint or WCS)" : `${frame.wavelength_um.toFixed(4)} um / width ${frame.bandwidth_um.toFixed(4)} um`;
-  $("frame-details").textContent = `Frame ${state.current + 1}/${state.frames.length} | ${r.observation} | ${r.collection} | Target wavelength: ${wave} | Finite display coverage: ${frame.coverage}% | Target in footprint: ${frame.center_covered ? "yes" : "no"} | Any FLAGS bits in cutout: ${frame.flagged_percent}% (includes source flags; not a bad-pixel fraction) | FINAST code: ${frame.astrometry_code ?? "not supplied"} | ${frame.unit}. Same display scale for all frames.`;
+  $("frame-details").textContent = `Frame ${state.current + 1}/${state.frames.length} | ${r.observation} | ${r.collection} | Target wavelength: ${wave} | Finite display coverage: ${frame.coverage}% | Target in footprint: ${frame.center_covered ? "yes" : "no"} | Any FLAGS bits in cutout: ${frame.flagged_percent}% (includes source flags; not a bad-pixel fraction) | FINAST code: ${frame.astrometry_code ?? "not supplied"} | Pixels from: ${frame.source === "s3" ? "AWS S3 (partial read)" : "IRSA cutout service"} | ${frame.unit}. Same display scale for all frames.`;
   $("timeline-labels").firstElementChild.textContent = state.frames[0].record.date.slice(0, 10);
   $("timeline-labels").lastElementChild.textContent = state.frames.at(-1).record.date.slice(0, 10);
 }
@@ -223,16 +263,28 @@ async function loadFrames() {
   clearFrames();
   setBusy(true);
   const failures = [];
-  for (let i = 0; i < rows.length; i++) {
-    status(`Fetching cutout ${i + 1}/${rows.length} from IRSA...`);
-    try {
-      const frame = await api(`/api/frame/${state.search.search_id}/${rows[i].id}`);
-      if (generation !== state.generation) return;
-      state.frames.push({ ...frame, record: rows[i], values: decodePixels(frame.pixels) });
-    } catch (error) {
-      failures.push(`${rows[i].date}: ${error.message}`);
+  const results = new Array(rows.length);
+  const started = performance.now();
+  let next = 0, done = 0;
+  // A small worker pool keeps LOAD_CONCURRENCY requests in flight; results keep log order.
+  const worker = async () => {
+    while (next < rows.length) {
+      const i = next++;
+      try {
+        const frame = await api(`/api/frame/${state.search.search_id}/${rows[i].id}`);
+        results[i] = { ...frame, record: rows[i], values: decodePixels(frame.pixels) };
+      } catch (error) {
+        failures.push(`${rows[i].date}: ${error.message}`);
+      }
+      done++;
+      if (generation === state.generation) status(`Fetched ${done}/${rows.length} cutouts (${LOAD_CONCURRENCY} at a time)...`);
     }
-  }
+  };
+  status(`Fetching ${rows.length} cutouts...`);
+  await Promise.all(Array.from({ length: Math.min(LOAD_CONCURRENCY, rows.length) }, worker));
+  if (generation !== state.generation) return;
+  state.frames = results.filter(Boolean);
+  const seconds = ((performance.now() - started) / 1000).toFixed(1);
   setBusy(false);
   if (state.frames.length) {
     state.a = 0;
@@ -245,7 +297,7 @@ async function loadFrames() {
     draw();
   }
   renderTable();
-  status(failures.length ? `${state.frames.length}/${rows.length} frames loaded. ${failures.join(" ")}` : `${state.frames.length} aligned frames ready. Pin A/B or play a time sequence.`, failures.length > 0);
+  status(failures.length ? `${state.frames.length}/${rows.length} frames loaded in ${seconds} s. ${failures.join(" ")}` : `${state.frames.length} aligned frames ready in ${seconds} s. Pin A/B or play a time sequence.`, failures.length > 0);
 }
 
 async function searchField(event) {
@@ -273,7 +325,8 @@ async function searchField(event) {
     const share = new URL(window.location.href);
     share.search = params.toString();
     history.replaceState(null, "", share);
-    status(state.search.records.length ? `Found ${state.search.records.length} overlapping exposures. Load the selected first/last dates to compare.` : state.search.warnings.length ? "No records returned from available collections. Coverage is unknown for failed collections; see warnings." : "No coverage in the searched collections for this field. Try another target or release.");
+    const incomplete = (state.search.collection_status || []).filter((s) => s.status !== "ok" && s.status !== "empty").map((s) => s.collection);
+    status(state.search.records.length ? `Found ${state.search.records.length} overlapping exposures.${incomplete.length ? ` Results are incomplete for ${incomplete.join(", ")}; see warnings.` : ""} Load the selected first/last dates to compare.` : state.search.warnings.length ? "No records returned from available collections. Coverage is unknown for failed collections; see warnings." : "No coverage in the searched collections for this field. Try another target or release.");
   } catch (error) {
     setBusy(false);
     status(error.message, true);

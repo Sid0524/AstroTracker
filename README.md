@@ -16,13 +16,15 @@ python -m venv .venv
 Open <http://127.0.0.1:8000>. If the environment already exists, only the last
 command is needed. Stop the server with Ctrl+C. It binds only to localhost.
 Flask's development server is for the local demo, not Internet deployment.
+Pixels are read from IRSA's public AWS copy when available (needs `fsspec` and
+`aiohttp`, in requirements.txt), with the IRSA cutout service as fallback.
 
 ## First comparison
 
 1. Leave Barnard's Star selected and click **Search this field**.
 2. Keep D1, then click **Load selected (2)** to fetch the first and last available
    calendar dates in that detector band.
-3. Click **Play** to blink A/B. Select additional exposures in the log (up to 8),
+3. Click **Play** to blink A/B. Select additional exposures in the log (up to 32),
    reload, and choose **Time sequence** to step through all loaded frames.
 
 Pin any loaded exposure as A or B using the log. The slider and arrow buttons
@@ -36,6 +38,10 @@ deep-survey collections, all six detector bands, UTC exposure dates, collection,
 detector-wide wavelength range, target-specific wavelength/bandwidth from the
 FITS WCS-WAVE lookup table, pixel coverage, FLAGS fraction and FINAST metadata,
 direct FITS links, and explicit loading/no-coverage/partial-failure/error states.
+An observation timeline shows which UTC dates and detectors have data in each
+collection, groups them into survey windows, and states whether each collection's
+coverage is known (ok / empty / partial / truncated / failed). Click a mark to
+select that date in that detector.
 
 ## Data path and limits
 
@@ -45,9 +51,12 @@ direct FITS links, and explicit loading/no-coverage/partial-failure/error states
   `spherex_qr3`, and their `_deep` variants. QR2 is not queried.
 - Each collection is capped at 1,500 records, with a visible truncation warning.
   Failed collections remain visible as warnings, never interpreted as no coverage.
+  Each search returns a per-collection status; see
+  [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for sources, statuses and limits.
 - Cutouts use the returned on-premises FITS URL with `center` and `size`; a 1.5x
   padded square covers detector rotation. Only selected exposures are downloaded,
-  sequentially in the UI. No full-image or bulk downloads.
+  4 at a time in the UI. No full-image or bulk downloads; S3 reads fetch only the
+  rows that cover the field.
 - FITS IMAGE data are bilinearly resampled using celestial TAN/SIP WCS onto the
   same 128x128 north-up/east-left TAN sky grid. Missing/nonfinite pixels are shown
   dark blue, not filled with invented image data. Every frame reports its finite
@@ -55,10 +64,11 @@ direct FITS links, and explicit loading/no-coverage/partial-failure/error states
 - Target wavelength uses the alternate WCS-WAVE mapping, without accidentally
   applying the primary celestial SIP distortion to detector pixel coordinates.
 - The server limits concurrent archive requests to 3, metadata responses to 8 MB
-  and cutouts to 16 MB. Transient HTTP 429/502/503/504 gets one logged retry;
+  and cutouts to 16 MB. Transient HTTP 429/502/503/504 and responses cut off
+  mid-download get two logged retries (after 1 s and 4 s);
   individual network requests time out after 90 seconds. Searches can take longer
   for multiple collections or a retry. Errors allow manual reload/retry.
-- In-memory caches retain at most 8 searches and 16 rendered frames; searches
+- In-memory caches retain at most 8 searches and 64 rendered frames; searches
   expire after one hour and restarting clears all caches. No raw FITS files are
   stored. Cutout fetch URLs are restricted to current IRSA spectral-image paths.
 
@@ -72,8 +82,12 @@ distance/radial-velocity model. It is a convenient fixed field center, not
 precision astrometry. Its J2000 position is over four arcmin away and would miss
 the star in a default 3-arcmin view.
 [SIMBAD source](https://simbad.u-strasbg.fr/simbad/sim-id?Ident=NAME%20Barnard%27s%20star&output.format=ASCII).
-WISE 0855 uses the supplied reference position 133.7951292, -7.2451472 degrees;
-its visibility and motion are not guaranteed.
+WISE 0855 moves about 8 arcsec/yr. The challenge's reference position
+(133.7951292, -7.2451472; epoch about 2010) is 122-130 arcsec from the object in
+2025-26, outside a 3-arcmin view. The default WISE sample is therefore a 2026.0
+position, 133.759470, -7.242557, propagated with CatWISE2020 proper motion; the
+reference position remains as a separate sample. See
+[docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 Overlapping exposures are **not independent visits**. The first/last selection
 uses distinct UTC calendar dates, not a visit grouping or coaddition.
@@ -109,6 +123,17 @@ The first/last frames had 100%/99.6% finite display coverage. A live QR3-only
 WISE 0855 search returned zero records without errors. IRSA intermittently
 returned 503 during cutout checks; the bounded retry/error paths handle this.
 These checks establish viewer operation, not a scientific motion detection.
+
+`test_data_quality.py` adds regression tests for empty, partial and failed IRSA
+responses (zero-row tables, malformed rows, record caps, cut-off downloads,
+HTTP and network errors, maintenance pages, bad or partial cutouts), driven
+through the real request path with fake responses. On 2026-11-14 all 40 offline
+tests passed. Live DR1/QR3 results for Barnard's Star and WISE 0855 are in
+[docs/VERIFICATION.md](docs/VERIFICATION.md); regenerate them with:
+
+```powershell
+.\.venv\Scripts\python.exe tools\verify_releases.py --deep
+```
 
 Official references:
 [Data access](https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-access/),
