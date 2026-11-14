@@ -1,0 +1,12 @@
+{
+  "name": "astrotracker-frontend-tests",
+  "private": true,
+  "description": "Component tests for the SPHEREx viewer UI (static/*.js) using jsdom.",
+  "scripts": {
+    "test": "node --test tests/js/*.test.cjs",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include=static/*.js --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 tests/js/*.test.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

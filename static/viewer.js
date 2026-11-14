@@ -3,12 +3,12 @@
 const $ = (id) => document.getElementById(id);
 const MAX_SELECTED = 32;    // frames are ~90 KB each once aligned
 const LOAD_CONCURRENCY = 4; // cutouts fetched in parallel
-// WISE 0855 moves ~8 arcsec/yr west; by 2025-26 it is ~2 arcmin from the
-// challenge's reference position (see docs/VERIFICATION.md), so the default
-// sample uses a CatWISE2020-propagated 2026.0 position.
+// WISE 0855 moves ~8"/yr; the default uses its 2026 position (docs/VERIFICATION.md).
 const samples = { barnard: [269.446268, 4.768204], wise: [133.75947, -7.242557], wiseref: [133.7951292, -7.2451472] };
 const state = { search: null, selected: new Set(), frames: [], current: 0, a: 0, b: 1, timer: null, busy: false, generation: 0 };
 const bandLabels = { "SPHEREx-D1": "D1 / 0.75-1.09 um", "SPHEREx-D2": "D2 / 1.10-1.62 um", "SPHEREx-D3": "D3 / 1.63-2.41 um", "SPHEREx-D4": "D4 / 2.42-3.82 um", "SPHEREx-D5": "D5 / 3.83-4.41 um", "SPHEREx-D6": "D6 / 4.42-5.00 um" };
+
+function plural(n, word) { return `${n} ${word}${n === 1 ? "" : "s"}`; }
 
 function status(message, error = false) {
   $("status").textContent = message;
@@ -111,7 +111,7 @@ function updateSelection() {
   $("load").disabled = state.busy || !state.selected.size;
   const rows = filtered();
   const dates = new Set(rows.map((r) => r.date.slice(0, 10)));
-  $("selection-summary").textContent = `${rows.length} exposures / ${dates.size} calendar dates / ${state.selected.size} selected`;
+  $("selection-summary").textContent = `${plural(rows.length, "exposure")} / ${plural(dates.size, "calendar date")} / ${state.selected.size} selected`;
   drawTimeline();
 }
 
@@ -266,7 +266,7 @@ async function loadFrames() {
   const results = new Array(rows.length);
   const started = performance.now();
   let next = 0, done = 0;
-  // A small worker pool keeps LOAD_CONCURRENCY requests in flight; results keep log order.
+  // Worker pool: LOAD_CONCURRENCY in flight, results kept in log order.
   const worker = async () => {
     while (next < rows.length) {
       const i = next++;
@@ -297,7 +297,7 @@ async function loadFrames() {
     draw();
   }
   renderTable();
-  status(failures.length ? `${state.frames.length}/${rows.length} frames loaded in ${seconds} s. ${failures.join(" ")}` : `${state.frames.length} aligned frames ready in ${seconds} s. Pin A/B or play a time sequence.`, failures.length > 0);
+  status(failures.length ? `${state.frames.length}/${rows.length} frames loaded in ${seconds} s. ${failures.join(" ")}` : `${plural(state.frames.length, "aligned frame")} ready in ${seconds} s. Pin A/B or play a time sequence.`, failures.length > 0);
 }
 
 async function searchField(event) {
@@ -326,7 +326,7 @@ async function searchField(event) {
     share.search = params.toString();
     history.replaceState(null, "", share);
     const incomplete = (state.search.collection_status || []).filter((s) => s.status !== "ok" && s.status !== "empty").map((s) => s.collection);
-    status(state.search.records.length ? `Found ${state.search.records.length} overlapping exposures.${incomplete.length ? ` Results are incomplete for ${incomplete.join(", ")}; see warnings.` : ""} Load the selected first/last dates to compare.` : state.search.warnings.length ? "No records returned from available collections. Coverage is unknown for failed collections; see warnings." : "No coverage in the searched collections for this field. Try another target or release.");
+    status(state.search.records.length ? `Found ${plural(state.search.records.length, "overlapping exposure")}.${incomplete.length ? ` Results are incomplete for ${incomplete.join(", ")}; see warnings.` : ""} Load the selected first/last dates to compare.` : state.search.warnings.length ? "No records returned from available collections. Coverage is unknown for failed collections; see warnings." : "No coverage in the searched collections for this field. Try another target or release.");
   } catch (error) {
     setBusy(false);
     status(error.message, true);
@@ -359,3 +359,8 @@ const initial = new URLSearchParams(window.location.search);
 for (const id of ["ra", "dec", "fov", "release"]) if (initial.has(id)) $(id).value = initial.get(id);
 $("deep").checked = initial.get("deep") === "1";
 if (initial.has("ra") || initial.has("dec")) $("sample").value = "custom";
+
+// For Node tests; no-op in the browser.
+if (typeof module === "object" && module.exports) {
+  module.exports = { state, MAX_SELECTED, LOAD_CONCURRENCY, samples, searchField, loadFrames, pickFromTimeline, drawTimeline, draw, step };
+}

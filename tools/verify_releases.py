@@ -191,12 +191,13 @@ def report(name, target, results, checks, fov_arcmin):
         for result in results.values():
             dates = sorted({day(r["mjd"]) for r in result["rows"] if r["band"] == band})
             count = sum(r["band"] == band for r in result["rows"])
-            cells.append(f"{count} on {len(dates)} dates" if count else "none")
+            cells.append(f"{count} on {len(dates)} date{'' if len(dates) == 1 else 's'}" if count else "none")
         out.append(f"| {band[-2:]} | " + " | ".join(cells) + " |")
     dr1 = {r["observation"] for r in results.get("spherex_dr1", {"rows": []})["rows"]}
     qr3 = {r["observation"] for r in results.get("spherex_qr3", {"rows": []})["rows"]}
     if dr1 and qr3:
-        out += ["", f"DR1/QR3 overlap: {len(dr1 & qr3)} exposure IDs appear in both releases "
+        out += ["", f"DR1/QR3 overlap: {len(dr1 & qr3)} observation IDs (obs_id, shared by "
+                "several exposures) appear in both releases "
                 f"({len(dr1 - qr3)} DR1-only, {len(qr3 - dr1)} QR3-only)."]
     if checks:
         out += ["", "Cutout spot checks (first/last exposure per collection and detector). "

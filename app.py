@@ -29,18 +29,14 @@ COLLECTIONS = ("spherex_dr1", "spherex_qr3", "spherex_dr1_deep", "spherex_qr3_de
 MAX_RECORDS = 1500
 GRID_SIZE = 128
 TTL = 3600
-# IRSA's proxy often returns 502 several times within a second (seen 2026-11-14),
-# so transient failures get two retries with backoff rather than one.
+# IRSA often returns bursts of 502s; retry twice with backoff.
 RETRY_DELAYS = (1, 4)
 searches = OrderedDict()
 frames = OrderedDict()
 cache_lock = threading.Lock()
 archive_slots = threading.BoundedSemaphore(3)
 FRAME_CACHE = 64
-# Pixels are read straight from IRSA's public AWS copy of SPHEREx (the bucket and
-# key come from each SIA row's cloud_access column), fetching only the rows that
-# cover the field. S3 scales far better than the on-demand cutout service, which
-# often answers "503 Server busy". Any S3 failure falls back to the IRSA cutout.
+# Pixels come from IRSA's public S3 copy (partial reads); IRSA cutouts are the fallback.
 S3_BUCKET = "nasa-irsa-spherex"
 S3_BASE = f"https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/"
 s3_slots = threading.BoundedSemaphore(8)
@@ -97,8 +93,7 @@ def archive_get(url, byte_limit):
         if len(data) > byte_limit:
             raise ViewerError("Archive response exceeds the demo limit. Narrow the field or release.")
         return data
-    # HTTPException covers responses cut off mid-body (IncompleteRead), which
-    # are not OSErrors and would otherwise escape as an unhandled server error.
+    # HTTPException: body cut off mid-download (not an OSError).
     except (HTTPError, URLError, TimeoutError, OSError, HTTPException) as exc:
         app.logger.warning("IRSA request failed: %s", exc)
         raise ViewerError("IRSA is unavailable or timed out. Please retry; no data were substituted.") from exc
@@ -179,8 +174,7 @@ def parse_records(raw, collection):
             seen.add(url)
             record = parse_row(row, url, collection)
             if record is None:
-                # One malformed row must not hide the rest of the collection,
-                # but it is counted so the UI can say the list is incomplete.
+                # Skip and count bad rows rather than dropping the collection.
                 skipped += 1
                 continue
             records.append(record)
@@ -270,14 +264,7 @@ def render_cutout(raw, ra, dec, fov):
 
 
 def collection_status(rows, truncated, skipped, error):
-    """Classify one collection's outcome so 'no coverage' never hides 'unknown'.
-
-    ok        every returned row is usable
-    empty     IRSA answered and reported no overlapping exposures
-    partial   some rows were unusable and skipped
-    truncated the record cap was hit; later exposures are missing
-    failed    the query failed or returned nothing usable; coverage is unknown
-    """
+    """Classify a collection result: ok, empty, partial, truncated or failed (unknown)."""
     if error is not None:
         return "failed", f"{error} Coverage in this collection is unknown."
     if skipped and not rows:
@@ -293,8 +280,7 @@ def collection_status(rows, truncated, skipped, error):
 
 
 def s3_cutout(url, ra, dec, fov):
-    """Read only the rows covering the field from S3; return a small FITS file
-    shaped like an IRSA cutout (IMAGE, FLAGS, WCS-WAVE) for render_cutout()."""
+    """Partial S3 read, repackaged like an IRSA cutout for render_cutout()."""
     if not s3_slots.acquire(timeout=10):
         raise TimeoutError("S3 reads are busy")
     try:
@@ -317,8 +303,7 @@ def s3_cutout(url, ra, dec, fov):
             data = image.section[y0:y1, x0:x1]
             flags = hdus["FLAGS"].section[y0:y1, x0:x1]
             shifted = header.copy()
-            # Both the celestial and the alternate wavelength WCS are defined in
-            # detector pixels, so a sub-image only needs its reference pixels moved.
+            # Both WCSs are in detector pixels: shift the reference pixels.
             for suffix in ("", "W"):
                 if f"CRPIX1{suffix}" in shifted:
                     shifted[f"CRPIX1{suffix}"] -= x0

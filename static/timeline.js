@@ -1,8 +1,6 @@
 "use strict";
 
-// Observation timeline: which UTC dates and detectors have data in each
-// searched collection, and whether a collection's coverage is actually known.
-// Kept separate from viewer.js; viewer.js calls ObservationTimeline.render().
+// Observation timeline: dates x detectors per release, and whether coverage is known.
 const ObservationTimeline = (() => {
   const SVG = "http://www.w3.org/2000/svg";
   const BANDS = ["SPHEREx-D1", "SPHEREx-D2", "SPHEREx-D3", "SPHEREx-D4", "SPHEREx-D5", "SPHEREx-D6"];
@@ -103,7 +101,7 @@ const ObservationTimeline = (() => {
 
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": "Observation timeline by detector" });
 
-    // Survey windows: a shaded band per cluster of dates, labelled with its span.
+    // Survey windows (dates < 30 days apart).
     for (const w of windows) {
       const x0 = x(w.start) - 4, x1 = x(w.end) + 4;
       svg.append(el("rect", { x: x0, y: TOP - 4, width: x1 - x0, height: ROW * BANDS.length + 4, class: "obs-window" }));
@@ -160,8 +158,12 @@ const ObservationTimeline = (() => {
 
     const dates = new Set(records.map((r) => r.date.slice(0, 10)));
     const bandDates = new Set(records.filter((r) => r.band === band).map((r) => r.date.slice(0, 10)));
-    summary.textContent = `${records.length} exposures on ${dates.size} UTC dates in ${windows.length} survey window${windows.length > 1 ? "s" : ""}, ${records[0].date.slice(0, 10)} to ${records.at(-1).date.slice(0, 10)}. ${band ? `${band.replace("SPHEREx-", "")} has ${bandDates.size} dates.` : ""} Click a mark to select that date's first exposure; click again to deselect.`;
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    summary.textContent = `${plural(records.length, "exposure")} on ${plural(dates.size, "UTC date")} in ${windows.length} survey window${windows.length > 1 ? "s" : ""}, ${records[0].date.slice(0, 10)} to ${records.at(-1).date.slice(0, 10)}. ${band ? `${band.replace("SPHEREx-", "")} has ${plural(bandDates.size, "date")}.` : ""} Click a mark to select that date's first exposure; click again to deselect.`;
   }
 
   return { render, groupRecords, surveyWindows };
 })();
+
+// For Node tests; no-op in the browser.
+if (typeof module === "object" && module.exports) module.exports = ObservationTimeline;

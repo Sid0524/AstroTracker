@@ -106,6 +106,9 @@ spectra, motion fitting, production deployment and survey-scale search.
 
 ## Checks
 
+Full test, coverage and CI details: [docs/TESTING.md](docs/TESTING.md).
+Frontend component tests: `npm ci` then `npm test`.
+
 ```powershell
 .\.venv\Scripts\python.exe -m unittest -q
 ```

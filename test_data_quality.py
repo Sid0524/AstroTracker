@@ -1,9 +1,4 @@
-"""Regression tests for empty, partial and failed IRSA responses.
-
-These tests drive the real request path (urlopen -> archive_get -> parse ->
-/api/search or /api/frame) with fake IRSA responses, so they check what a user
-would actually see when the archive misbehaves. No network access is used.
-"""
+"""Empty, partial and failed IRSA responses, through the real request path."""
 
 import io
 import time

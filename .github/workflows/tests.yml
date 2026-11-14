@@ -1,0 +1,37 @@
+# Advisory check: offline tests + coverage. Reports results, never blocks a merge.
+name: Tests (advisory)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt coverage
+
+      - name: Backend tests + coverage (target 90%)
+        run: |
+          coverage run -m unittest -q
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY" || echo "::warning::Backend coverage below 90%"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Frontend tests + coverage (lines 90%, branches 80%)
+        run: |
+          set -o pipefail
+          npm run --silent coverage | tee coverage.txt
+          echo '```' >> "$GITHUB_STEP_SUMMARY"; grep -E "file|static|\.js|all files" coverage.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"

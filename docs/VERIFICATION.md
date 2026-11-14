@@ -144,7 +144,7 @@ Center RA 269.446268, Dec 4.768204; 3.0 arcmin field; motion source: SIMBAD (REA
 | D5 | 41 on 11 dates | 25 on 6 dates | none | none |
 | D6 | 41 on 14 dates | 21 on 7 dates | none | none |
 
-DR1/QR3 overlap: 0 exposure IDs appear in both releases (129 DR1-only, 64 QR3-only).
+DR1/QR3 overlap: 0 observation IDs appear in both releases (129 DR1-only, 64 QR3-only).
 
 Cutout spot checks (first/last exposure per collection and detector). Peak S/N is the brightest pixel within 2 native pixels of the predicted position; a neighbouring source can produce it, so it is a sanity check, not a detection. Any-FLAGS % counts every set bit, including source bits.
 
