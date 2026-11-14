@@ -1,4 +1,4 @@
-# Advisory check: offline tests + coverage. Reports results, never blocks a merge.
+# Advisory: Flask viewer tests + coverage. Reports, never blocks a merge.
 name: Tests (advisory)
 
 on:
@@ -33,5 +33,5 @@ jobs:
       - name: Frontend tests + coverage (lines 90%, branches 80%)
         run: |
           set -o pipefail
-          npm run --silent coverage | tee coverage.txt
+          npm run --silent coverage:viewer | tee coverage.txt
           echo '```' >> "$GITHUB_STEP_SUMMARY"; grep -E "file|static|\.js|all files" coverage.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -4,6 +4,10 @@ source = .
 omit =
     test_*.py
     tests/*
+    # SpaceLapse tools have their own tests (tests/test_release_index.py)
+    tools/build_index.py
+    tools/build_tracks.py
+    tools/validate_targets.py
 
 [report]
 show_missing = True

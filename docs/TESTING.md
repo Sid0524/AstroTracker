@@ -5,8 +5,8 @@ All tests are offline: no IRSA or S3 access is needed.
 ```powershell
 .\.venv\Scripts\python.exe -m coverage run -m unittest -q   # backend
 .\.venv\Scripts\python.exe -m coverage report               # fails under 90%
-npm ci; npm test                                            # frontend (jsdom)
-npm run coverage                                            # lines 90%, branches 80%
+npm ci; npm run test:viewer                                 # frontend (jsdom)
+npm run coverage:viewer                                     # lines 90%, branches 80%
 ```
 
 CI runs both suites on every push and PR (`.github/workflows/tests.yml`). The check
