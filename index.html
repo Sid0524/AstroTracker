@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09111e">
+  <title>SPHEREx | Sky in motion</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/viewer.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">S<span>+</span></span> SPHEREx <small>SKY VIEWER</small></a>
+    <a href="https://irsa.ipac.caltech.edu/applications/spherex" target="_blank" rel="noopener">Open IRSA archive &#8599;</a>
+  </header>
+  <main>
+    <section class="intro">
+      <div class="eyebrow">NASA SPACE APPS / FIRST MILESTONE</div>
+      <h1>One sky. <span>Different moments.</span></h1>
+      <p>Explore real infrared exposures. Find a field, choose observations, and blink through time.</p>
+      <div class="tag"><span></span> Live data from IRSA <b>DR1 + QR3</b></div>
+    </section>
+    <div class="workspace">
+      <aside class="panel search-panel">
+        <div class="section-title"><span class="eyebrow">01 / FIND A FIELD</span><span class="tiny">ICRS</span></div>
+        <label for="sample">Sample target</label>
+        <select id="sample">
+          <option value="barnard">Barnard's Star</option>
+          <option value="wise">WISE 0855</option>
+          <option value="custom">Custom coordinates</option>
+        </select>
+        <p class="hint">Barnard's Star uses an approximate J2026 center; WISE 0855 uses a reference position. The field center stays fixed across dates.</p>
+        <form id="search-form">
+          <div class="coordinate-row">
+            <div><label for="ra">RA <small>degrees</small></label><input id="ra" name="ra" type="number" min="0" max="359.999999999" step="any" value="269.446268" required></div>
+            <div><label for="dec">Dec <small>degrees</small></label><input id="dec" name="dec" type="number" min="-90" max="90" step="any" value="4.768204" required></div>
+          </div>
+          <label for="fov">Field of view <small>square width</small></label>
+          <select id="fov" name="fov">
+            <option value="1">1 arcmin</option><option value="3" selected>3 arcmin</option>
+            <option value="6">6 arcmin</option><option value="12">12 arcmin</option>
+          </select>
+          <label for="release">Data release</label>
+          <select id="release" name="release"><option value="both">DR1 + QR3</option><option value="dr1">DR1</option><option value="qr3">QR3</option></select>
+          <label class="check"><input id="deep" type="checkbox"> Include deep-survey collections</label>
+          <button id="search-button" class="primary" type="submit">Search this field <span aria-hidden="true">&#8594;</span></button>
+        </form>
+        <div class="divider"></div>
+        <div class="section-title"><span class="eyebrow">02 / CHOOSE OBSERVATIONS</span></div>
+        <label for="band">Detector band</label>
+        <select id="band" disabled><option value="SPHEREx-D1">D1</option></select>
+        <p class="hint">Comparisons use one detector. Its narrow-band wavelength still varies between exposures.</p>
+        <div id="selection-summary" class="selection-summary">Search to find available exposures.</div>
+        <div class="selection-actions">
+          <button id="suggest" type="button" disabled>Pick first + last date</button>
+          <button id="load" class="primary" type="button" disabled>Load selected (0)</button>
+        </div>
+        <p class="hint">At most 8 selected cutouts. A search retrieves metadata only.</p>
+      </aside>
+      <section class="panel viewer-panel" aria-label="Image viewer">
+        <div class="viewer-top"><span class="eyebrow">03 / INSPECT THE SKY</span><span id="field-label" class="tiny">NORTH UP / EAST LEFT</span></div>
+        <div class="image-stage">
+          <canvas id="sky" width="128" height="128" aria-label="Aligned infrared image"></canvas>
+          <div class="compass" aria-hidden="true"><span>N &#8593;</span><span>E &#8592;</span></div>
+          <div class="crosshair" aria-hidden="true"></div>
+          <div id="empty-state" class="empty-state"><div class="orbit" aria-hidden="true"></div><h2>A window into the infrared</h2><p>Start with Barnard's Star or enter any sky coordinates.<br>Images are fetched only when you load a selection.</p></div>
+          <div id="image-badge" class="image-badge" hidden></div>
+          <div id="scale" class="scale" hidden></div>
+        </div>
+        <div id="status" class="status" role="status" aria-live="polite">Ready to search. No simulated imagery.</div>
+        <div id="warnings" class="warnings" role="alert" hidden></div>
+        <div class="playback">
+          <button id="prev" aria-label="Previous frame" disabled>&#8592;</button>
+          <button id="play" class="primary" disabled>Play</button>
+          <button id="next" aria-label="Next frame" disabled>&#8594;</button>
+          <select id="mode" aria-label="Playback mode"><option value="blink">Blink A/B</option><option value="sequence">Time sequence</option></select>
+          <select id="speed" aria-label="Frame duration"><option value="1000">1 second</option><option value="500">0.5 seconds</option><option value="2000">2 seconds</option></select>
+        </div>
+        <input id="timeline" class="timeline" type="range" min="0" max="0" value="0" aria-label="Observation frame" disabled>
+        <div id="timeline-labels" class="timeline-labels"><span>No frames loaded</span><span></span></div>
+        <div class="stretch">
+          <span class="tiny">SHARED ASINH STRETCH</span>
+          <label for="low">Low <input id="low" type="number" step="any" disabled></label>
+          <label for="high">High <input id="high" type="number" step="any" disabled></label>
+          <button id="reset-stretch" disabled>Auto</button>
+        </div>
+        <div id="frame-details" class="frame-details">Observation dates, wavelengths, release, and coverage will appear here.</div>
+      </section>
+    </div>
+    <section class="panel observations">
+      <div class="section-title"><div><span class="eyebrow">OBSERVATION LOG</span><h2>Exposures, not independent visits</h2></div><span id="record-count" class="tiny">0 RECORDS</span></div>
+      <p class="hint">Rows are overlapping exposures. Select up to 8 in one detector band. Loaded frames can be pinned as A or B.</p>
+      <div class="table-scroll"><table><thead><tr><th scope="col">Select</th><th scope="col">Observation UTC</th><th scope="col">Release</th><th scope="col">Band range</th><th scope="col">Exposure ID</th><th scope="col">Compare / data</th></tr></thead><tbody id="records"><tr><td colspan="6" class="table-empty">Search a field to see its observation history.</td></tr></tbody></table></div>
+    </section>
+    <section class="science-note">
+      <strong>Exploration is not a discovery claim.</strong>
+      <p>These views resample calibrated IMAGE data onto a common sky grid, not a precision motion measurement. SPHEREx's native pixels are about 6.15 arcsec; display resampling adds no resolution. Wavelength, PSF, background, flags, and astrometric residuals can mimic changes. Zodi is not subtracted and flag masks are not applied. Missing coverage or a missing Gaia counterpart is not evidence of Planet X.</p>
+    </section>
+  </main>
+  <footer><span>SPHEREx Sky Viewer &middot; Local demo, not an official NASA/IRSA product</span><a href="https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-access/" target="_blank" rel="noopener">Data access guide &#8599;</a></footer>
+</body>
+</html>
