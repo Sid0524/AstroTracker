@@ -1,0 +1,211 @@
+// Aperture photometry on aligned cutouts + a small SVG brightness-vs-time chart.
+
+import { PIXEL_ARCSEC } from './cutout.js';
+
+const R_AP = 2.5, R_IN = 5, R_OUT = 8;
+// MJy/sr summed over pixels -> mJy: 1e9 mJy/MJy × pixel solid angle (sr).
+const TO_MJY = 1e9 * ((PIXEL_ARCSEC / 206265) ** 2);
+
+// Snap a click to the brightest pixel within 2 px (on the median stack).
+export function snapToPeak(img, n, i, j) {
+  let best = [i, j], bv = -Infinity;
+  for (let y = Math.max(0, j - 2); y <= Math.min(n - 1, j + 2); y++) {
+    for (let x = Math.max(0, i - 2); x <= Math.min(n - 1, i + 2); x++) {
+      const v = img[y * n + x];
+      if (v > bv) { bv = v; best = [x, y]; }
+    }
+  }
+  return best;
+}
+
+export function photometry(d, n, cx, cy, sigma) {
+  let sum = 0, npix = 0, holes = 0;
+  const ring = [];
+  for (let y = Math.max(0, Math.floor(cy - R_OUT)); y <= Math.min(n - 1, Math.ceil(cy + R_OUT)); y++) {
+    for (let x = Math.max(0, Math.floor(cx - R_OUT)); x <= Math.min(n - 1, Math.ceil(cx + R_OUT)); x++) {
+      const r = Math.hypot(x - cx, y - cy), v = d[y * n + x];
+      if (!Number.isFinite(v)) { if (r <= R_AP) holes++; continue; }
+      if (r <= R_AP) { sum += v; npix++; } else if (r >= R_IN && r <= R_OUT) ring.push(v);
+    }
+  }
+  // Blank pixels at the centre mean the star saturated the detector.
+  if (holes) return { saturated: true };
+  if (npix < 10 || ring.length < 20) return null;
+  ring.sort((a, b) => a - b);
+  const bg = ring[ring.length >> 1];
+  return { flux: (sum - bg * npix) * TO_MJY, err: sigma * Math.sqrt(npix) * TO_MJY };
+}
+
+const W = 760, H = 230, M = { l: 56, r: 16, t: 14, b: 30 };
+
+function niceTicks(lo, hi, count = 4) {
+  const span = hi - lo || 1;
+  const step0 = span / count, mag = 10 ** Math.floor(Math.log10(step0));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toPrecision(12));
+  return out;
+}
+
+function fmtFlux(v) {
+  const a = Math.abs(v);
+  return a >= 1000 ? `${(v / 1000).toFixed(a >= 10000 ? 0 : 1)} Jy` : `${v.toFixed(a >= 100 ? 0 : a >= 10 ? 1 : 2)} mJy`;
+}
+
+// points: [{mjd, date, flux, err, i}] ; current: index into frames
+export function renderChart(svg, points, current, fmtDate) {
+  if (!points.length) { svg.innerHTML = ''; return; }
+  const t0 = points[0].mjd, t1 = points[points.length - 1].mjd;
+  const tp = Math.max(1, (t1 - t0) * 0.03);
+  const lo = Math.min(...points.map(p => p.flux - p.err));
+  const hi = Math.max(...points.map(p => p.flux + p.err));
+  const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.1 || 1;
+  const y0 = lo - pad, y1 = hi + pad;
+  const X = t => M.l + ((t - (t0 - tp)) / (t1 - t0 + 2 * tp)) * (W - M.l - M.r);
+  const Y = v => H - M.b - ((v - y0) / (y1 - y0)) * (H - M.t - M.b);
+
+  const yTicks = niceTicks(y0, y1);
+  const grid = yTicks.map(v => `
+    <line x1="${M.l}" x2="${W - M.r}" y1="${Y(v)}" y2="${Y(v)}" class="lc-grid"/>
+    <text x="${M.l - 8}" y="${Y(v) + 4}" text-anchor="end" class="lc-tick">${fmtFlux(v)}</text>`).join('');
+
+  // Month ticks along the bottom
+  const xt = [];
+  const start = new Date((t0 - 40587) * 864e5), end = new Date((t1 - 40587) * 864e5);
+  const months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth();
+  const step = months > 18 ? 6 : months > 8 ? 3 : months > 2 ? 1 : 0;
+  if (step) {
+    for (const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1)); d <= end; d.setUTCMonth(d.getUTCMonth() + step)) {
+      const x = X(d.getTime() / 864e5 + 40587);
+      xt.push(`<text x="${x}" y="${H - 8}" text-anchor="middle" class="lc-tick">${d.toLocaleDateString(undefined, { month: 'short', year: '2-digit', timeZone: 'UTC' })}</text>`);
+    }
+  } else {
+    xt.push(`<text x="${X(t0)}" y="${H - 8}" text-anchor="start" class="lc-tick">${fmtDate(points[0].date)}</text>`);
+    xt.push(`<text x="${X(t1)}" y="${H - 8}" text-anchor="end" class="lc-tick">${fmtDate(points[points.length - 1].date)}</text>`);
+  }
+
+  const marks = points.map((p, k) => {
+    const x = X(p.mjd), y = Y(p.flux);
+    const cur = p.i === current;
+    return `<g class="lc-pt${cur ? ' cur' : ''}" data-k="${k}">
+      <line x1="${x}" x2="${x}" y1="${Y(p.flux - p.err)}" y2="${Y(p.flux + p.err)}" class="lc-err"/>
+      <circle cx="${x}" cy="${y}" r="${cur ? 6 : 4.5}" class="lc-dot"/>
+      <circle cx="${x}" cy="${y}" r="12" class="lc-hit"/>
+    </g>`;
+  }).join('');
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `${grid}
+    <line x1="${M.l}" x2="${W - M.r}" y1="${H - M.b}" y2="${H - M.b}" class="lc-axis"/>
+    ${xt.join('')}${marks}`;
+}
+
+export function toCSV(points) {
+  return 'date_utc,mjd,wavelength_um,flux_mJy,err_mJy,measured_flux_mJy\n' + points.map(p =>
+    `${p.date.toISOString()},${p.mjd.toFixed(5)},${p.lam ? p.lam.toFixed(4) : ''},${p.flux.toFixed(4)},${p.err.toFixed(4)},${(p.rawFlux ?? p.flux).toFixed(4)}`).join('\n');
+}
+
+// Brightness vs wavelength: every measurement from every band on one axis.
+// points: [{lam, flux, err, det, date}]
+export function renderSpectrum(svg, points) {
+  if (!points.length) { svg.innerHTML = ''; return; }
+  const l0 = Math.min(...points.map(p => p.lam)), l1 = Math.max(...points.map(p => p.lam));
+  const lp = (l1 - l0) * 0.03 || 0.05;
+  const lo = Math.min(...points.map(p => p.flux - p.err));
+  const hi = Math.max(...points.map(p => p.flux + p.err));
+  const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.1 || 1;
+  const y0 = lo - pad, y1 = hi + pad;
+  const X = l => M.l + ((l - (l0 - lp)) / (l1 - l0 + 2 * lp)) * (W - M.l - M.r);
+  const Y = v => H - M.b - ((v - y0) / (y1 - y0)) * (H - M.t - M.b);
+  const grid = niceTicks(y0, y1).map(v => `
+    <line x1="${M.l}" x2="${W - M.r}" y1="${Y(v)}" y2="${Y(v)}" class="lc-grid"/>
+    <text x="${M.l - 8}" y="${Y(v) + 4}" text-anchor="end" class="lc-tick">${fmtFlux(v)}</text>`).join('');
+  const xt = niceTicks(l0 - lp, l1 + lp, 6).map(l => `
+    <text x="${X(l)}" y="${H - 8}" text-anchor="middle" class="lc-tick">${+l.toFixed(2)} µm</text>`).join('');
+  const marks = points.map((p, k) => {
+    const x = X(p.lam), y = Y(p.flux);
+    return `<g class="lc-pt" data-k="${k}">
+      <line x1="${x}" x2="${x}" y1="${Y(p.flux - p.err)}" y2="${Y(p.flux + p.err)}" class="lc-err"/>
+      <circle cx="${x}" cy="${y}" r="3.5" class="lc-dot"/>
+      <circle cx="${x}" cy="${y}" r="10" class="lc-hit"/>
+    </g>`;
+  }).join('');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `${grid}
+    <line x1="${M.l}" x2="${W - M.r}" y1="${H - M.b}" y2="${H - M.b}" class="lc-axis"/>
+    ${xt}${marks}`;
+}
+
+export function spectrumCSV(points) {
+  return 'wavelength_um,flux_mJy,err_mJy,detector,date_utc\n' + points.map(p =>
+    `${p.lam.toFixed(4)},${p.flux.toFixed(4)},${p.err.toFixed(4)},D${p.det},${p.date.toISOString()}`).join('\n');
+}
+
+// Remove brightness differences caused only by the wavelength each visit saw.
+// Fits flux(λ) with a low-order polynomial (iteratively clipping outliers, so a
+// flare or eclipse doesn't bend the fit), then rescales every point to the
+// band's mean wavelength. Variability that isn't tied to wavelength survives.
+// Returns { points, lam0, degree } or null when there isn't enough to fit.
+export function colourCorrect(points) {
+  const pts = points.filter(p => p.lam > 0 && p.flux === p.flux);
+  if (pts.length < 6) return null;
+  const lam0 = pts.reduce((s, p) => s + p.lam, 0) / pts.length;
+  const span = Math.max(...pts.map(p => p.lam)) - Math.min(...pts.map(p => p.lam));
+  if (!(span > 0)) return null;
+  const degree = pts.length >= 12 ? 2 : 1;
+  let use = pts.map(() => true);
+  let coef = null;
+  for (let iter = 0; iter < 4; iter++) {
+    coef = polyfit(pts.filter((_, i) => use[i]).map(p => (p.lam - lam0) / span), pts.filter((_, i) => use[i]).map(p => p.flux), degree);
+    if (!coef) return null;
+    const res = pts.map(p => p.flux - polyval(coef, (p.lam - lam0) / span));
+    const absd = res.filter((_, i) => use[i]).map(Math.abs).sort((a, b) => a - b);
+    const sigma = 1.4826 * absd[absd.length >> 1] || 0;
+    const next = res.map(r => !sigma || Math.abs(r) < 3 * sigma);
+    if (next.every((v, i) => v === use[i])) break;
+    use = next;
+  }
+  const ref = polyval(coef, 0);
+  if (!(ref > 0)) return null;
+  const out = points.map(p => {
+    if (!(p.lam > 0)) return p;
+    const m = polyval(coef, (p.lam - lam0) / span);
+    if (!(m > 0)) return p;
+    const k = ref / m;
+    return { ...p, flux: p.flux * k, err: p.err * k, rawFlux: p.flux };
+  });
+  return { points: out, lam0, degree };
+}
+
+function polyval(c, x) {
+  let v = 0;
+  for (let i = c.length - 1; i >= 0; i--) v = v * x + c[i];
+  return v;
+}
+
+// Least-squares polynomial via normal equations (degree ≤ 2, well conditioned on scaled x).
+function polyfit(xs, ys, degree) {
+  const n = degree + 1;
+  if (xs.length < n + 1) return null;
+  const A = Array.from({ length: n }, () => new Float64Array(n + 1));
+  for (let k = 0; k < xs.length; k++) {
+    const pw = [1];
+    for (let i = 1; i < n; i++) pw.push(pw[i - 1] * xs[k]);
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) A[i][j] += pw[i] * pw[j];
+      A[i][n] += pw[i] * ys[k];
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    let piv = i;
+    for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[piv][i])) piv = r;
+    [A[i], A[piv]] = [A[piv], A[i]];
+    if (Math.abs(A[i][i]) < 1e-12) return null;
+    for (let r = 0; r < n; r++) {
+      if (r === i) continue;
+      const f = A[r][i] / A[i][i];
+      for (let c = i; c <= n; c++) A[r][c] -= f * A[i][c];
+    }
+  }
+  return Array.from({ length: n }, (_, i) => A[i][n] / A[i][i]);
+}
