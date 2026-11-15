@@ -35,6 +35,7 @@ No install, no account, no backend. Everything runs in the browser.
   issue (labelled `candidate`) with its position, date, images and a link to the view.
 - **Archive coverage:** dates by detector and release, with the releases searched and
   index date. Failed index tiles show as incomplete coverage, not as "no images".
+- **Ask SpaceLapse:** plain-language AI help with what is on screen and how to use the app (OpenAI first, OpenRouter fallback; see [docs/ASSISTANT.md](docs/ASSISTANT.md)).
 - **Known asteroids** labelled on each frame, from IMCCE's SkyBoT service.
 - **Light curves and spectra:** click any star to plot its brightness at every visit,
   or switch to *Spectrum* to measure it in every exposure across all six bands and
