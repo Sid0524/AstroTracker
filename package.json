@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node --test \"tests/*.test.js\"",
     "test:viewer": "node --test \"tests/js/*.test.cjs\"",
-    "coverage:viewer": "node --test --experimental-test-coverage --test-coverage-include=static/*.js --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 \"tests/js/*.test.cjs\""
+    "coverage:viewer": "node --test --experimental-test-coverage --test-coverage-include=static/*.js --test-coverage-include=js/coverage.js --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 \"tests/js/*.test.cjs\" tests/coverage.test.js"
   },
   "devDependencies": {
     "jsdom": "^26.1.0"

@@ -18,7 +18,7 @@ function setup() {
 
 const status = (collection, s, count = 0, skipped = 0) => ({ collection, status: s, count, skipped, message: `${collection} ${s} detail` });
 
-test("before any search it invites the user to search", () => {
+test("P1: before any search it invites the user to search", () => {
   const t = setup();
   t.render(null);
   assert.match(t.q(".obs-chart").textContent, /Search a field/);
@@ -26,25 +26,25 @@ test("before any search it invites the user to search", () => {
   assert.equal(t.q(".obs-summary").textContent, "");
 });
 
-test("no records with a failed release says coverage is unknown, not empty", () => {
+test("P1: no records with a failed release says coverage is unknown, not empty", () => {
   const t = setup();
   t.render({ records: [], collection_status: [status("spherex_dr1", "empty"), status("spherex_qr3", "failed")] });
   assert.match(t.q(".obs-chart").textContent, /coverage is unknown, not empty/);
 });
 
-test("no records with every release answering says there is no coverage", () => {
+test("P1: no records with every release answering says there is no coverage", () => {
   const t = setup();
   t.render({ records: [], collection_status: [status("spherex_qr3", "empty")] });
   assert.match(t.q(".obs-chart").textContent, /have no exposures of this field/);
 });
 
-test("a search without collection_status (older backend) still renders", () => {
+test("P1: a search without collection_status (older backend) still renders", () => {
   const t = setup();
   t.render({ records: [] });
   assert.match(t.q(".obs-chart").textContent, /no exposures/);
 });
 
-test("each release gets a status chip with its outcome, colour class and full message", () => {
+test("P1: each release gets a status chip with its outcome, colour class and full message", () => {
   const t = setup();
   t.render({ records: [rec(0)], collection_status: [
     status("spherex_dr1", "ok", 252), status("spherex_qr3", "empty"),
@@ -64,7 +64,7 @@ test("each release gets a status chip with its outcome, colour class and full me
   assert.ok(chips[1].querySelector(".swatch.qr3"));
 });
 
-test("one mark per detector, UTC day and release, in the detector's row", () => {
+test("P1: one mark per detector, UTC day and release, in the detector's row", () => {
   const t = setup();
   const records = [
     rec(0, { mjd: 60914.2 }), rec(1, { mjd: 60914.3 }),                       // same day, same band -> one mark
@@ -84,7 +84,7 @@ test("one mark per detector, UTC day and release, in the detector's row", () => 
   assert.equal(t.qa(".obs-band").length, 6, "all six detectors have a row");
 });
 
-test("the selected detector row and selected/loaded exposures are highlighted", () => {
+test("P1/UI: the selected detector row and selected/loaded exposures are highlighted", () => {
   const t = setup();
   t.render({ records: [rec(0), rec(1, { mjd: 60940.2 })], collection_status: [] },
     { band: "SPHEREx-D1", selected: new Set(["0"]), loaded: new Set(["0"]) });
@@ -99,7 +99,7 @@ test("the selected detector row and selected/loaded exposures are highlighted", 
   assert.equal(second.querySelector(".obs-loaded"), null);
 });
 
-test("survey windows group dates closer than 30 days and are labelled", () => {
+test("P1: survey windows group dates closer than 30 days and are labelled", () => {
   const t = setup();
   const records = [];
   for (let i = 0; i < 20; i++) records.push(rec(i, { mjd: 60900 + i * 2 }));       // window 1: 39 days
@@ -111,7 +111,7 @@ test("survey windows group dates closer than 30 days and are labelled", () => {
   assert.equal(t.app.timeline.surveyWindows(records).length, 2);
 });
 
-test("month ticks are thinned so labels do not collide on a long baseline", () => {
+test("UI: month ticks are thinned so labels do not collide on a long baseline", () => {
   const t = setup();
   t.render({ records: [rec(0, { mjd: 58000 }), rec(1, { mjd: 61000 })], collection_status: [] });
   const labels = t.qa(".obs-axis").map((l) => l.textContent);
@@ -119,7 +119,7 @@ test("month ticks are thinned so labels do not collide on a long baseline", () =
   assert.match(labels[0], /^\d{4}-\d{2}$/);
 });
 
-test("a single-date search still gets a readable axis and singular wording", () => {
+test("UI: a single-date search still gets a readable axis and singular wording", () => {
   const t = setup();
   t.render({ records: [rec(0)], collection_status: [] }, { band: null });
   assert.match(t.q(".obs-summary").textContent, /1 exposure on 1 UTC date in 1 survey window,/);
@@ -127,7 +127,7 @@ test("a single-date search still gets a readable axis and singular wording", () 
   assert.equal(t.qa(".obs-window-label").length, 0, "too narrow to label");
 });
 
-test("clicking or pressing Enter/Space on a mark picks that group", () => {
+test("P1/UI: clicking or pressing Enter/Space on a mark picks that group", () => {
   const t = setup();
   t.render({ records: [rec(0), rec(1, { mjd: 60914.25 })], collection_status: [] });
   const mark = t.q(".obs-mark");
@@ -142,7 +142,7 @@ test("clicking or pressing Enter/Space on a mark picks that group", () => {
   assert.equal(mark.getAttribute("role"), "button");
 });
 
-test("while loading, marks are inert and leave the tab order", () => {
+test("UI: while loading, marks are inert and leave the tab order", () => {
   const t = setup();
   t.render({ records: [rec(0)], collection_status: [] }, { busy: true });
   const mark = t.q(".obs-mark");
@@ -152,7 +152,7 @@ test("while loading, marks are inert and leave the tab order", () => {
   assert.ok(mark.classList.contains("busy"));
 });
 
-test("groupRecords keys by band, UTC day and collection and sorts chronologically", () => {
+test("P1: groupRecords keys by band, UTC day and collection and sorts chronologically", () => {
   const t = setup();
   const groups = t.app.timeline.groupRecords([rec(0, { mjd: 60920 }), rec(1, { mjd: 60910 }), rec(2, { mjd: 60910.1 })]);
   assert.deepEqual(groups.map((g) => g.records.length), [2, 1]);
@@ -160,8 +160,16 @@ test("groupRecords keys by band, UTC day and collection and sorts chronologicall
   assert.match(groups[0].key, /^SPHEREx-D1\|\d{4}-\d{2}-\d{2}\|spherex_dr1$/);
 });
 
-test("the legend explains every visual encoding", () => {
+test("UI: the legend explains every visual encoding", () => {
   const t = setup();
   const legend = t.q(".obs-legend").textContent;
   for (const word of ["DR1", "QR3", "Deep survey", "Selected", "Loaded", "Survey window"]) assert.match(legend, new RegExp(word));
+});
+
+test("UI: status chips use singular wording for one exposure and one skipped row", () => {
+  const t = setup();
+  t.render({ records: [rec(0)], collection_status: [status("spherex_dr1", "ok", 1), status("spherex_qr3", "partial", 1, 1)] });
+  const chips = t.qa(".collection-status li").map((c) => c.textContent);
+  assert.match(chips[0], /DR1 1 exposure$/);
+  assert.match(chips[1], /QR3 1 exposure, 1 unreadable row skipped$/);
 });

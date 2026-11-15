@@ -8,10 +8,10 @@ export const CHALLENGE_GUIDES = [
     caveat: 'Approximate 2026 fixed center, not a propagated position.' },
   { name: 'Epsilon Indi B', ra: 331.04414658852124, dec: -56.78284419511611, size: 160, band: 6,
     guide: 'Explore the longer-wavelength detectors and blink separated dates. Ba and Bb are unresolved; this is the brown-dwarf companion, not Epsilon Indi A.',
-    caveat: 'CDS Sesame J2000 fixed center; high proper motion can move the source away from the marker.' },
+    caveat: 'CDS Sesame J2000 fixed center. With ~4.7 arcsec/yr proper motion the source is about 2 arcmin from the marker by 2025-26.' },
   { name: 'WISE 0855', ra: 133.7951292, dec: -7.2451472, size: 240, band: 6,
     guide: 'Start with D6 and the widest field. Check coverage and quality before blinking. This faint brown dwarf may not be visible in individual exposures.',
-    caveat: 'Fixed challenge reference position, not propagated to the observing date.' },
+    caveat: 'Fixed challenge reference position (epoch ~2010). In 2025-26 the object is about 2 arcmin west of center (CatWISE2020 motion).' },
   { name: 'RW Aurigae', ra: 76.95652603458, dec: 30.40143817389, size: 96, band: 1,
     guide: 'Click the star for a brightness plot, restrict the wavelength window, and inspect flagged or excluded visits before interpreting variability.',
     caveat: 'CDS Sesame J2000 fixed center. Wavelength and image artifacts can mimic variability.' },
@@ -29,7 +29,10 @@ export function challengeGuide(target) {
 export async function validateTarget(target, findExposures, signal) {
   const report = { target: target.name, checkedAt: new Date().toISOString(), center: [target.ra, target.dec],
     caveat: target.caveat, size: target.size, counts: {}, samples: [], comparison: null };
-  const exposures = await findExposures(target.ra, target.dec, signal);
+  // Accepts a plain list, or findExposuresDetailed's {exposures, tiles, failedTiles}.
+  const found = await findExposures(target.ra, target.dec, signal);
+  const exposures = Array.isArray(found) ? found : found.exposures;
+  if (found.failedTiles?.length) report.coverageWarning = `${found.failedTiles.length} of ${found.tiles} index tiles failed to load; counts may be incomplete.`;
   for (const e of exposures) report.counts[e.detector] = (report.counts[e.detector] || 0) + 1;
   const band = report.counts[target.band] ? target.band : Number(Object.keys(report.counts).sort((a, b) => report.counts[b] - report.counts[a])[0]);
   report.band = band || null;

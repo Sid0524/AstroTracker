@@ -132,7 +132,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("_IRSA down_", text)
         self.assertIn("2025-08-27..2025-08-28 (2); 2026-03-01..2026-03-01 (1)", text)
         self.assertIn("| D1 | 3 on 3 dates | 1 on 1 date |", text)
-        self.assertIn("DR1/QR3 overlap: 1 observation IDs (obs_id", text)
+        self.assertIn("DR1/QR3 overlap: 1 observation ID (obs_id", text)
         self.assertIn("| NO |", text)
         self.assertIn("error: boom", text)
 

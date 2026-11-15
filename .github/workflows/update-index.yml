@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build index
-        run: python3 -u tools/build_index.py ${{ inputs.refresh && format('--refresh {0}', inputs.refresh) || '' }}
+        run: python3 -u tools/build_index.py --max-minutes 120 ${{ inputs.refresh && format('--refresh {0}', inputs.refresh) || '' }}
       - name: Build featured tracks
         run: python3 -u tools/build_tracks.py
       - name: Commit changes

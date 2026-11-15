@@ -263,20 +263,24 @@ def render_cutout(raw, ra, dec, fov):
         raise ViewerError("The FITS cutout could not be read or aligned. Try another exposure.") from exc
 
 
+def plural(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
 def collection_status(rows, truncated, skipped, error):
     """Classify a collection result: ok, empty, partial, truncated or failed (unknown)."""
     if error is not None:
         return "failed", f"{error} Coverage in this collection is unknown."
     if skipped and not rows:
-        return "failed", (f"all {skipped} returned rows were unreadable. "
+        return "failed", (f"all {plural(skipped, 'returned row')} {'was' if skipped == 1 else 'were'} unreadable. "
                           "Coverage in this collection is unknown.")
     if truncated:
         return "truncated", f"results capped at {MAX_RECORDS}; narrow the search."
     if skipped:
-        return "partial", f"{skipped} malformed rows skipped; the list may be incomplete."
+        return "partial", f"{plural(skipped, 'malformed row')} skipped; the list may be incomplete."
     if not rows:
         return "empty", "no overlapping exposures."
-    return "ok", f"{len(rows)} exposures."
+    return "ok", f"{plural(len(rows), 'exposure')}."
 
 
 def s3_cutout(url, ra, dec, fov):

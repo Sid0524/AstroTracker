@@ -272,6 +272,13 @@
       </div>
 
       <div class="filmstrip" id="filmstrip"></div>
+      <section class="coverage-panel" id="coverageSection" hidden aria-labelledby="coverageTitle">
+        <div class="timeline-heading"><span class="section-kicker" id="coverageTitle">ARCHIVE COVERAGE</span><span>Dates by detector and release</span></div>
+        <p class="hint coverage-warning" id="coverageWarning" role="alert" hidden></p>
+        <div class="coverage-chart" id="coverageChart" role="group" aria-label="Exposures by detector and date"></div>
+        <p class="hint" id="coverageSummary" role="status"></p>
+        <p class="hint coverage-legend"><span class="cov-key rel-dr1"></span>DR1 <span class="cov-key rel-qr3"></span>QR3 <span class="cov-key rel-qr2"></span>QR2 <span class="cov-key window"></span>Survey window</p>
+      </section>
       <details class="observation-details" id="qualityInspector">
         <summary>Inspect image quality &amp; source files</summary>
         <p class="hint">Orange marks pixels rejected by conservative native-support checks, including image edges. SOURCE (bit 21) is retained for science but excluded from background estimation.</p>

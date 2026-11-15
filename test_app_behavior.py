@@ -145,3 +145,10 @@ class S3EdgeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WordingTests(unittest.TestCase):
+    def test_collection_status_uses_singular_for_one(self):
+        self.assertEqual(app.collection_status([{}], False, 0, None), ("ok", "1 exposure."))
+        self.assertIn("1 malformed row skipped", app.collection_status([{}], False, 1, None)[1])
+        self.assertIn("all 1 returned row was unreadable", app.collection_status([], False, 1, None)[1])

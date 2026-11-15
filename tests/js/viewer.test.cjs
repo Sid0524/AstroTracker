@@ -312,7 +312,7 @@ test("P1: results from a superseded load are discarded", async () => {
   assert.equal(app.viewer.state.frames.length, 0);
 });
 
-test("loading with nothing selected does nothing", async () => {
+test("O2/UI: loading with nothing selected does nothing", async () => {
   const fake = backend({ records: [rec(0)] });
   const app = loadApp({ fetch: fake.fetch });
   await search(app);
@@ -395,7 +395,7 @@ test("O2: a flat image still gets a valid stretch, and step/draw are no-ops befo
   assert.equal(Number(app.$("high").value), Number(app.$("low").value) + 1);
 });
 
-test("UI text uses correct singular/plural wording for one exposure, date and frame", async () => {
+test("UI: UI text uses correct singular/plural wording for one exposure, date and frame", async () => {
   const app = loadApp({ fetch: backend({ records: [rec(0)] }).fetch });
   await search(app);
   assert.match(app.$("status").textContent, /^Found 1 overlapping exposure\. /);

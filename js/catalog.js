@@ -166,6 +166,7 @@ function decodeRow(v, o, index) {
     detector: det,
     mjd,
     date: mjdToDate(mjd),
+    release: coll,
     url: exposureUrl(coll, folder, ver, id, det),
   };
 }
@@ -182,11 +183,25 @@ function contains(v, o, ra, dec) {
   return Math.max(Math.abs(u), Math.abs(w)) / HALF_SIDE;
 }
 
-// Returns exposures sorted by time: {id, detector, mjd, date, url}
+// Returns exposures sorted by time: {id, detector, mjd, date, release, url}
 export async function findExposures(ra, dec, signal) {
+  return (await findExposuresDetailed(ra, dec, signal)).exposures;
+}
+
+// Like findExposures, but a failed tile leaves the rest usable and is reported:
+// {exposures, tiles, failedTiles}. Throws only if every needed tile failed.
+export async function findExposuresDetailed(ra, dec, signal) {
   const index = await withAbort(loadIndex(), signal);
   const keys = tilesNear(ra, dec, SEARCH_R, index.tileDeg).filter(k => index.tiles[k]);
-  const buffers = await Promise.all(keys.map(k => loadTile(k, signal)));
+  const settled = await Promise.allSettled(keys.map(k => loadTile(k, signal)));
+  const aborted = settled.find(r => r.status === 'rejected' && r.reason?.name === 'AbortError');
+  if (aborted) throw aborted.reason;
+  const failedTiles = keys.filter((_, i) => settled[i].status === 'rejected');
+  if (keys.length && failedTiles.length === keys.length) {
+    const cause = settled[0].reason?.message || String(settled[0].reason);
+    throw new Error(`Could not load the SPHEREx index for this position (${cause}), so coverage is unknown. Search again to retry.`);
+  }
+  const buffers = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
   const out = [];
   for (const buf of buffers) {
     const v = new DataView(buf);
@@ -195,7 +210,7 @@ export async function findExposures(ra, dec, signal) {
       if (edge !== null) out.push({ ...decodeRow(v, o, index), edge });
     }
   }
-  return deduplicateExposures(out);
+  return { exposures: deduplicateExposures(out), tiles: keys.length, failedTiles };
 }
 
 // Exposures that caught a moving object. positionAt(mjd) -> {ra, dec, vmag} | null.

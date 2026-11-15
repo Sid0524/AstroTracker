@@ -67,6 +67,34 @@ A 6 arcmin field around the reference position would include the object.
 - At 375 px width, the timeline scrolls inside its panel and the page does not
   scroll sideways.
 
+## SpaceLapse (deployed app), 2026-11-14
+
+SpaceLapse searches a static index, last rebuilt on 2026-11-10, instead of querying IRSA.
+
+| Target | Index result | Live IRSA (above) |
+|---|---|---|
+| Barnard's Star | 361 exposures, 40 dates, 2025-08-15 to 2026-09-22 (QR2 239, QR3 122) | Same date span; DR1 252 + QR3 128 |
+| WISE 0855 (either position) | 256 exposures, 27 dates, 2025-05-05 to 2026-05-14 (QR2 only) | Same dates; no QR3 coverage |
+
+The index counts every detector footprint that covers the point; IRSA's search
+used a 3 arcmin circle. That explains the different counts.
+
+- **QR2 is superseded.** IRSA now lists only QR3 and DR1. QR2 files are still on
+  S3 (HTTP 200), so links work, but they are older processing (`l2b-v20`) than
+  DR1 (`l2b-v27`). The index holds QR2 (129 folders) and QR3 (22), and no DR1.
+- **DR1 rebuild.** The builder and the app already support DR1, and the app
+  prefers DR1 over QR copies of the same exposure. The weekly workflow adds DR1
+  folders. TAP was slow during testing (one DR1 folder, 8,142 rows, took 11
+  minutes), so the workflow now has a 120-minute budget. Folders that are
+  unfinished or failed are retried on the next run, so DR1 fills in over several
+  runs. A manual run of "Update SPHEREx index and tracks" speeds this up.
+- **Missing-release behavior (new).** An empty search names the searched releases,
+  the index date, and that DR1 is not indexed yet. If some index tiles fail, the
+  results still show with a "Coverage incomplete" warning. If all fail, the app
+  reports "coverage is unknown".
+- **Browser check:** Barnard's Star showed 6 detector rows and 101 coverage marks
+  (QR2 and QR3) in 3 survey windows. Clicking a D6 mark switched the detector to D6.
+
 ## Retry benchmark in the browser UI (2026-11-14, 15:04-15:11 local)
 
 Twenty fixed targets were run through the real page. For each target the run set

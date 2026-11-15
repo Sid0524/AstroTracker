@@ -196,7 +196,7 @@ def report(name, target, results, checks, fov_arcmin):
     dr1 = {r["observation"] for r in results.get("spherex_dr1", {"rows": []})["rows"]}
     qr3 = {r["observation"] for r in results.get("spherex_qr3", {"rows": []})["rows"]}
     if dr1 and qr3:
-        out += ["", f"DR1/QR3 overlap: {len(dr1 & qr3)} observation IDs (obs_id, shared by "
+        out += ["", f"DR1/QR3 overlap: {len(dr1 & qr3)} observation ID{'' if len(dr1 & qr3) == 1 else 's'} (obs_id, shared by "
                 "several exposures) appear in both releases "
                 f"({len(dr1 - qr3)} DR1-only, {len(qr3 - dr1)} QR3-only)."]
     if checks:

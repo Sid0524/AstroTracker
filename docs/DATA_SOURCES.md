@@ -110,6 +110,28 @@ returns 422 without trying IRSA.
   (`Invoke-WebRequest`) usually installs the root automatically.
 - Caches are in memory only: 8 searches, 16 frames, and a 1-hour search lifetime.
 
+## SpaceLapse (deployed app)
+
+| Data | Source |
+|---|---|
+| Exposure list | Static index `data/index.json` + `data/tiles/*.bin`, built weekly by `tools/build_index.py` from IRSA TAP |
+| Pixels, FLAGS, wavelength | IRSA's public S3 copy, partial reads in the browser |
+
+- **Coverage messages:** an empty search names the searched releases and the index
+  date. Failed index tiles are reported as incomplete or unknown coverage, never as
+  "no images".
+- **Coverage panel:** dates by detector and release. Click a mark to switch
+  detector or jump to the nearest loaded date.
+- **Limits:**
+  - The index can be up to a week old.
+  - DR1 fills in over several weekly runs.
+  - QR2 entries are superseded processing until DR1 replaces them.
+  - A footprint match is not guaranteed usable pixels.
+- **Rebuilding:** see [INDEX_REBUILD.md](INDEX_REBUILD.md).
+- **Builder reliability:** `--max-minutes` stops starting new folders when time
+  runs out. Failed and deferred folders stay incomplete for the next run, and
+  are listed in `refreshProvenance`.
+
 ## Official references
 
 - [SPHEREx data access](https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-access/)

@@ -1,4 +1,5 @@
-# Advisory: Flask viewer tests + coverage. Reports, never blocks a merge.
+# Advisory: all offline tests + coverage for both apps. Reports, never blocks a merge.
+# Each suite runs even if an earlier one fails, so the summary always shows all results.
 name: Tests (advisory)
 
 on:
@@ -20,9 +21,15 @@ jobs:
       - run: pip install -r requirements.txt coverage
 
       - name: Backend tests + coverage (target 90%)
+        continue-on-error: true
         run: |
           coverage run -m unittest -q
+          echo "### Backend coverage" >> "$GITHUB_STEP_SUMMARY"
           coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY" || echo "::warning::Backend coverage below 90%"
+
+      - name: SpaceLapse index builder tests (existing)
+        continue-on-error: true
+        run: python -m unittest tests/test_release_index.py
 
       - uses: actions/setup-node@v4
         with:
@@ -30,8 +37,13 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Frontend tests + coverage (lines 90%, branches 80%)
+      - name: SpaceLapse unit tests
+        continue-on-error: true
+        run: npm test
+
+      - name: Component tests + coverage (lines 90%, branches 80%)
+        continue-on-error: true
         run: |
           set -o pipefail
           npm run --silent coverage:viewer | tee coverage.txt
-          echo '```' >> "$GITHUB_STEP_SUMMARY"; grep -E "file|static|\.js|all files" coverage.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+          { echo "### Frontend coverage"; echo '```'; grep -E "file|\.js|all files" coverage.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

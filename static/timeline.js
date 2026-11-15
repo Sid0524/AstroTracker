@@ -7,11 +7,12 @@ const ObservationTimeline = (() => {
   const RANGES = ["0.75-1.09", "1.10-1.62", "1.63-2.41", "2.42-3.82", "3.83-4.41", "4.42-5.00"];
   const WINDOW_GAP_DAYS = 30;
   const W = 960, LEFT = 104, RIGHT = 16, TOP = 34, ROW = 30, BOTTOM = 8;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
   const STATUS_TEXT = {
-    ok: (s) => `${s.count} exposures`,
+    ok: (s) => plural(s.count, "exposure"),
     empty: () => "searched: no exposures here",
-    partial: (s) => `${s.count} exposures, ${s.skipped} unreadable rows skipped`,
-    truncated: (s) => `${s.count} exposures shown; list capped, later dates may be missing`,
+    partial: (s) => `${plural(s.count, "exposure")}, ${plural(s.skipped, "unreadable row")} skipped`,
+    truncated: (s) => `${plural(s.count, "exposure")} shown; list capped, later dates may be missing`,
     failed: () => "query failed: coverage unknown",
   };
 
@@ -158,7 +159,6 @@ const ObservationTimeline = (() => {
 
     const dates = new Set(records.map((r) => r.date.slice(0, 10)));
     const bandDates = new Set(records.filter((r) => r.band === band).map((r) => r.date.slice(0, 10)));
-    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
     summary.textContent = `${plural(records.length, "exposure")} on ${plural(dates.size, "UTC date")} in ${windows.length} survey window${windows.length > 1 ? "s" : ""}, ${records[0].date.slice(0, 10)} to ${records.at(-1).date.slice(0, 10)}. ${band ? `${band.replace("SPHEREx-", "")} has ${plural(bandDates.size, "date")}.` : ""} Click a mark to select that date's first exposure; click again to deselect.`;
   }
 

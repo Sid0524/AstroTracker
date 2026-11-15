@@ -1,5 +1,6 @@
 import { resolve, formatRA, formatDec } from './resolve.js';
-import { findExposures, findAlongPath, DETECTORS, loadIndex, summarizeIndex } from './catalog.js';
+import { findExposuresDetailed, findAlongPath, DETECTORS, loadIndex, summarizeIndex } from './catalog.js';
+import { renderCoverage, coverageSummary, noCoverageMessage, partialCoverageMessage, nearestIndex } from './coverage.js';
 import { ephemeris, positionAt } from './ephem.js';
 import { makeCutout, PIXEL_ARCSEC } from './cutout.js';
 import { tanDeproject, tanProject, D2R } from './wcs.js';
@@ -211,11 +212,15 @@ async function lookAt(query, opts = {}) {
     document.title = `${target.name || 'Sky position'} · SPHEREx Time-Lapse`;
     setLoading('Searching the SPHEREx archive…');
 
-    state.exposures = await findExposures(target.ra, target.dec, abort.signal);
+    const found = await findExposuresDetailed(target.ra, target.dec, abort.signal);
     if (abort.signal.aborted) return;
+    archiveIndex ??= await loadIndex();
+    state.exposures = found.exposures;
+    state.coverageNote = found.failedTiles.length ? partialCoverageMessage(found.failedTiles.length, found.tiles) : '';
+    if (state.coverageNote) toast(state.coverageNote);
     if (!state.exposures.length) {
       setLoading('');
-      toast('SPHEREx hasn’t released images of this spot yet. Try another target.');
+      if (!state.coverageNote) toast(noCoverageMessage(indexSummary()));
       renderBands();
       return;
     }
@@ -250,6 +255,7 @@ async function trackObject(name, opts, abort) {
       : 'Positions from IMCCE Miriade. Comet predictions can be off by a minute of arc or two; if the object isn’t at the centre, try a wider field of view.';
     if (!eph.precise && !opts.size && eph.kind === 'comet') { state.size = 160; renderSizes(); }
     state.exposures = exps;
+    state.coverageNote = '';
     $('changes').hidden = true;
     $('targetName').textContent = eph.name;
     $('targetCoords').textContent = `Moving ${eph.kind || 'object'}`;
@@ -1733,7 +1739,7 @@ for (const guide of CHALLENGE_GUIDES) {
 let checksAbort = null;
 function appendCheckReport(report) {
   const li = document.createElement('li');
-  li.textContent = `${report.target}: ${report.outcome}. ${report.error || report.comparisonUnavailable || ''}`;
+  li.textContent = `${report.target}: ${report.outcome}. ${report.error || report.comparisonUnavailable || ''} ${report.coverageWarning || ''}`.trim();
   $('checkResults').appendChild(li);
 }
 try {
@@ -1766,7 +1772,7 @@ $('runChecks').addEventListener('click', async () => {
     if (signal.aborted) break;
     $('checksStatus').textContent = `Checking ${guide.name} (${validationResults.length + 1} of 5)...`;
     let report;
-    try { report = await validateTarget(guide, findExposures, AbortSignal.any([signal, AbortSignal.timeout(90000)])); }
+    try { report = await validateTarget(guide, findExposuresDetailed, AbortSignal.any([signal, AbortSignal.timeout(90000)])); }
     catch (error) {
       if (signal.aborted) break;
       report = { target: guide.name, checkedAt: new Date().toISOString(), outcome: 'Failed', error: error.message };
@@ -1847,6 +1853,34 @@ function renderBands() {
   $('bandInfo').querySelector('.band-count').textContent = counts[state.band]
     ? `${counts[state.band]} archive images`
     : 'No archive images in this band';
+  renderCoverageChart();
+}
+
+// Release scope of the loaded index, or null before it has loaded.
+function indexSummary() {
+  return archiveIndex ? summarizeIndex(archiveIndex) : null;
+}
+
+function renderCoverageChart() {
+  const section = $('coverageSection');
+  section.hidden = !state.target && !state.coverageNote;
+  renderCoverage($('coverageChart'), { exposures: state.exposures, band: state.band, detectors: DETECTORS, onPick: pickCoverage });
+  $('coverageSummary').textContent = state.exposures.length
+    ? coverageSummary(state.exposures, indexSummary())
+    : state.coverageNote || noCoverageMessage(indexSummary());
+  $('coverageWarning').hidden = !state.coverageNote;
+  $('coverageWarning').textContent = state.coverageNote || '';
+}
+
+// Coverage chart click: switch detector, or jump to the nearest loaded date.
+function pickCoverage(detector, mjd) {
+  if (detector !== state.band) { state.band = detector; renderBands(); loadBand(); return; }
+  const best = nearestIndex(loaded(), mjd);
+  if (best < 0) return;
+  stop();
+  if (state.mode === 'motion' || state.mode === 'static') setMode('play');
+  state.idx = best;
+  draw();
 }
 
 function renderSizes() {
@@ -2084,6 +2118,7 @@ fromHash();
 
 loadIndex().then(ix => {
   archiveIndex = ix;
+  if (state.target) renderCoverageChart();
   const summary = summarizeIndex(ix), freshness = summary.freshness;
   const updated = freshness.status === 'known' ? `${freshness.updatedAt} (${Math.floor(freshness.ageMs / 86400000)} days ago)` : 'unknown';
   $('stats').textContent = `${ix.total.toLocaleString()} indexed detector-image records · updated ${updated}`;

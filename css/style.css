@@ -540,3 +540,22 @@ dialog input[type=text], dialog input[type=number] {
   border: 1px solid var(--line); border-radius: 10px; color: var(--muted); text-decoration: none;
 }
 .ch-report:hover { border-color: var(--accent2); color: var(--accent2); }
+
+/* Archive coverage: dates by detector and release */
+.coverage-panel { margin-top: 14px; --dr1: #7de5d3; --qr3: #f2c46d; --qr2: #9aa7ff; }
+.coverage-chart { display: grid; gap: 4px; margin: 6px 0; }
+.cov-row { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 8px; }
+.cov-row.active .cov-label { color: var(--accent); font-weight: 700; }
+.cov-label { font-size: 11px; color: var(--muted); }
+.cov-lane { position: relative; height: 18px; background: rgba(255,255,255,.03); border-radius: 3px; }
+.cov-row.active .cov-lane { background: rgba(255,255,255,.08); }
+.cov-window { position: absolute; top: 0; bottom: 0; background: rgba(125,229,211,.06); border-inline: 1px solid rgba(125,229,211,.18); }
+.cov-mark { position: absolute; top: 3px; width: 4px; height: 12px; margin-left: -2px; padding: 0; border: 0; border-radius: 1px; cursor: pointer; background: var(--muted); }
+.cov-mark:hover, .cov-mark:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cov-mark.rel-dr1, .cov-key.rel-dr1 { background: var(--dr1); }
+.cov-mark.rel-qr3, .cov-key.rel-qr3 { background: var(--qr3); }
+.cov-mark.rel-qr2, .cov-key.rel-qr2 { background: var(--qr2); }
+.cov-key { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+.cov-key:first-child { margin-left: 0; }
+.cov-key.window { background: rgba(125,229,211,.12); border: 1px solid rgba(125,229,211,.3); }
+.coverage-warning { color: #f2d09c; }
