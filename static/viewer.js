@@ -77,6 +77,62 @@ function filtered() {
   return state.search?.records.filter((r) => r.band === $("band").value) || [];
 }
 
+// Shareable selection: band=D3&select=key1,key2. A key is obs_id + detector, e.g. 2025W33_2C_0321_1D3,
+// the stem of IRSA's level2_<key>_spx_*.fits. obs_id alone is not unique (one exposure spans two
+// detectors). Uniqueness of obs_id + detector was checked on live IRSA results (2026-11-14) for 3'
+// fields and for deep fields up to the 1,500-record cap; 12' fields were not verified (IRSA timed out).
+const KEY_PATTERN = /^[0-9A-Za-z_]{1,40}D[1-6]$/;
+let pendingSelection = null; // from the page URL; applied once, after the user clicks Search
+let sharedParams = null;     // parameters of the last successful search
+
+function exposureKey(record) { return `${record.observation}${record.band.replace("SPHEREx-", "")}`; }
+
+// Invalid bands and malformed or repeated keys are dropped silently; at most MAX_SELECTED keys.
+function parseSharedSelection(params) {
+  const band = /^D[1-6]$/.test(params.get("band") ?? "") ? params.get("band") : null;
+  const keys = (params.get("select") ?? "").split(",").map((k) => k.trim()).filter((k) => KEY_PATTERN.test(k));
+  return { band, keys: [...new Set(keys)].slice(0, MAX_SELECTED) };
+}
+
+function serializeSelection(band, keys) {
+  const params = new URLSearchParams();
+  const detector = String(band ?? "").replace("SPHEREx-", "");
+  if (/^D[1-6]$/.test(detector)) params.set("band", detector);
+  const valid = [...new Set(keys)].filter((k) => KEY_PATTERN.test(k)).slice(0, MAX_SELECTED);
+  if (valid.length) params.set("select", valid.join(","));
+  return params;
+}
+
+// Keeps band and select in the page URL in step with the selection (replaceState; no request).
+function writeShareUrl() {
+  if (!sharedParams || !state.search) return;
+  const params = new URLSearchParams(sharedParams);
+  const band = state.search.records.length ? $("band").value : null;
+  for (const [k, v] of serializeSelection(band, filtered().filter((r) => state.selected.has(r.id)).map(exposureKey))) params.set(k, v);
+  const share = new URL(window.location.href);
+  share.search = params.toString().replace(/%2C/gi, ","); // keys never contain commas; keep the list readable
+  history.replaceState(null, "", share);
+}
+
+// Returns null when the link had no keys; otherwise { found, total }. Unknown keys are ignored.
+function applyPendingSelection() {
+  const pending = pendingSelection;
+  pendingSelection = null;
+  if (!pending) return null;
+  const band = pending.band && `SPHEREx-${pending.band}`;
+  if (band && [...$("band").options].some((o) => o.value === band)) $("band").value = band;
+  if (!pending.keys.length) return null;
+  const byKey = new Map();
+  for (const r of filtered()) if (!byKey.has(exposureKey(r))) byKey.set(exposureKey(r), r.id);
+  const ids = pending.keys.map((k) => byKey.get(k)).filter(Boolean);
+  if (ids.length) {
+    state.selected.clear();
+    ids.forEach((id) => state.selected.add(id));
+    renderTable();
+  }
+  return { found: ids.length, total: pending.keys.length };
+}
+
 function clearFrames() {
   stop();
   state.frames = [];
@@ -116,6 +172,7 @@ function updateSelection() {
   const dates = new Set(rows.map((r) => r.date.slice(0, 10)));
   $("selection-summary").textContent = `${plural(rows.length, "exposure")} / ${plural(dates.size, "calendar date")} / ${state.selected.size} selected`;
   drawTimeline();
+  writeShareUrl();
 }
 
 function cell(row, value) {
@@ -326,14 +383,16 @@ async function searchField(event) {
     $("band").replaceChildren(...bands.map((band) => new Option(bandLabels[band], band)));
     $("field-label").textContent = `${state.search.ra.toFixed(4)}, ${state.search.dec.toFixed(4)} / ICRS`;
     gaia.setField({ ra: state.search.ra, dec: state.search.dec, fovArcmin: state.search.fov_arcmin });
-    setBusy(false);
-    pickEndpoints();
-    const share = new URL(window.location.href);
     if (gaia.isEnabled()) params.set("gaia", "1");
-    share.search = params.toString();
-    history.replaceState(null, "", share);
+    sharedParams = params; // URL is written by updateSelection() via writeShareUrl()
+    setBusy(false);
+    const restored = applyPendingSelection();
+    if (!restored?.found) pickEndpoints();
+    const restoreNote = !restored ? "" : restored.found === restored.total ?
+      `Restored ${plural(restored.found, "linked exposure")}. Click Load selected to fetch ${restored.found === 1 ? "it" : "them"}.` :
+      `Restored ${restored.found} of ${restored.total} linked exposures.${restored.found ? " Click Load selected to fetch them." : " Load the selected first/last dates to compare."}`;
     const incomplete = (state.search.collection_status || []).filter((s) => s.status !== "ok" && s.status !== "empty").map((s) => s.collection);
-    status(state.search.records.length ? `Found ${plural(state.search.records.length, "overlapping exposure")}.${incomplete.length ? ` Results are incomplete for ${incomplete.join(", ")}; see warnings.` : ""} Load the selected first/last dates to compare.` : state.search.warnings.length ? "No records returned from available collections. Coverage is unknown for failed collections; see warnings." : "No coverage in the searched collections for this field. Try another target or release.");
+    status(state.search.records.length ? `Found ${plural(state.search.records.length, "overlapping exposure")}.${incomplete.length ? ` Results are incomplete for ${incomplete.join(", ")}; see warnings.` : ""} ${restoreNote || "Load the selected first/last dates to compare."}` : state.search.warnings.length ? "No records returned from available collections. Coverage is unknown for failed collections; see warnings." : "No coverage in the searched collections for this field. Try another target or release.");
   } catch (error) {
     setBusy(false);
     status(error.message, true);
@@ -367,8 +426,10 @@ for (const id of ["ra", "dec", "fov", "release"]) if (initial.has(id)) $(id).val
 $("deep").checked = initial.get("deep") === "1";
 if (initial.has("ra") || initial.has("dec")) $("sample").value = "custom";
 if (initial.get("gaia") === "1") gaia.restore(true); // toggle only; never queries
+pendingSelection = parseSharedSelection(initial); // applied after Search; no request now
+if (pendingSelection.keys.length) status(`This link includes ${plural(pendingSelection.keys.length, "selected exposure")}. Click Search to restore the selection; nothing is downloaded until you click Load.`);
 
 // For Node tests; no-op in the browser.
 if (typeof module === "object" && module.exports) {
-  module.exports = { state, MAX_SELECTED, LOAD_CONCURRENCY, samples, searchField, loadFrames, pickFromTimeline, drawTimeline, draw, step };
+  module.exports = { state, MAX_SELECTED, LOAD_CONCURRENCY, samples, searchField, loadFrames, pickFromTimeline, drawTimeline, draw, step, exposureKey, parseSharedSelection, serializeSelection };
 }
