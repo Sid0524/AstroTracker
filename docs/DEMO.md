@@ -16,7 +16,7 @@ Read this first: the viewer shows calibrated SPHEREx images placed on a common s
 1. **Clone the repository and switch to the branch with the viewer changes.**
 
    ```powershell
-   git clone <repository-url> AstroTracker
+   git clone https://github.com/Sid0524/AstroTracker.git AstroTracker
    cd AstroTracker
    git switch feature/discovery-links
    ```
@@ -58,7 +58,7 @@ Read this first: the viewer shows calibrated SPHEREx images placed on a common s
    - Click **Load selected**. Only the selected exposures are downloaded, a few at a time. Each cutout is one exposure, not a full image.
 
 7. **Blink A/B and step through the frames.**
-   - In the observation log, click **A** on one loaded frame and **B** on another.
+   - In the observation log, click **A** on one loaded frame and **B** on another. Clicking A or B pins that loaded frame for the blink, so the frames must be loaded first (step 6).
    - Set the playback menu to **Blink A/B** and click **Play**. Use the **←** and **→** buttons to step through frames by hand.
    - Use the time slider to move through the dates.
    - Remember that these are overlapping exposures, not independent visits. Check the frame details under the image for the wavelength, coverage and flag fraction. Some pixels can look bright or dark because of the detector, the background or the quality flags, not the sky. The viewer does not subtract zodiacal light and does not apply flag masks.
@@ -68,6 +68,7 @@ Read this first: the viewer shows calibrated SPHEREx images placed on a common s
    - Click **Query Gaia**. The viewer asks the VizieR service for Gaia DR3 sources in the field.
    - Read the provenance line under the legend: it names the catalog (`I/355/gaiadr3`), the service (VizieR ASU), the query date, and the epoch the positions were propagated to.
    - The rings are **catalog positions**, not detections. Dashed rings are sources without proper motion, shown at their J2016.0 positions. A status of "Capped at 50" means only the 50 nearest sources are shown. A failed query is reported as "Query failed, Gaia not checked", and **Retry** sends it again.
+   - Rings move only slightly between frames. Barnard's Star has a large proper motion, so its marker shifts by about one or two SPHEREx pixels over a year. Other stars move by different amounts depending on their own motion.
    - Turning the overlay on does not query by itself, and a new search does not query again.
 
 9. **Copy the link and check that the selection is restored.**
