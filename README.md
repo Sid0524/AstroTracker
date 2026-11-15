@@ -255,6 +255,21 @@ python -m venv .venv
 - Tests (`python -m unittest`, `npm run test:viewer`): [docs/TESTING.md](docs/TESTING.md)
 - Rebuilding the SpaceLapse index (e.g. for DR1): [docs/INDEX_REBUILD.md](docs/INDEX_REBUILD.md)
 
+### ESA Gaia credit
+
+The optional Gaia DR3 overlay uses data from the European Space Agency mission Gaia.
+
+> This work has made use of data from the European Space Agency (ESA) mission Gaia (https://www.cosmos.esa.int/gaia), processed by the Gaia Data Processing and Analysis Consortium (DPAC, https://www.cosmos.esa.int/web/gaia/dpac/consortium). Funding for the DPAC has been provided by national institutions, in particular the institutions participating in the Gaia Multilateral Agreement.
+
+The Gaia data are open and free to use, provided credit is given to 'ESA/Gaia/DPAC'.
+
+Gaia data are distributed under CC BY-NC 3.0 IGO (ESA terms: https://www.cosmos.esa.int/web/esdc/terms-and-conditions). This viewer is a non-commercial demo; no licence ruling has been sought from ESA.
+
+Citations:
+
+- Gaia Collaboration et al. (2016b): The Gaia mission. Astronomy & Astrophysics, 595, A1. https://doi.org/10.1051/0004-6361/201629272
+- Gaia Collaboration et al. (2023j): Gaia Data Release 3. Summary of the content and survey properties. Astronomy & Astrophysics, 674, A1. https://doi.org/10.1051/0004-6361/202243940
+
 ## Data credit
 
 SPHEREx data are provided by NASA/JPL-Caltech and served by the NASA/IPAC Infrared
