@@ -70,6 +70,7 @@ Read this first: the viewer shows calibrated SPHEREx images placed on a common s
    - The rings are **catalog positions**, not detections. Dashed rings are sources without proper motion, shown at their J2016.0 positions. A status of "Capped at 50" means only the 50 nearest sources are shown. A failed query is reported as "Query failed, Gaia not checked", and **Retry** sends it again.
    - Rings move only slightly between frames. Barnard's Star has a large proper motion, so its marker shifts by about one or two SPHEREx pixels over a year. Other stars move by different amounts depending on their own motion.
    - Turning the overlay on does not query by itself, and a new search does not query again.
+   - See the [README](../README.md#esa-gaia-credit) for the Gaia credit and citations.
 
 9. **Copy the link and check that the selection is restored.**
    - After loading, the address bar contains the search parameters, the detector band (`band=D1`) and the selected exposures (`select=…`). Copy the address-bar link.
