@@ -99,6 +99,17 @@ observation IDs).
 `js/coverage.js`: 100% of lines and branches across both suites. `tools/build_index.py`: 98%.
 Tests also found and fixed a builder bug: `--recent 0` re-fetched every folder.
 
+### No data vs could not confirm, and caching
+
+| Behavior | Tests |
+|---|---|
+| Name lookup: unknown name vs unreachable service | `tests/js/resolve.test.cjs` |
+| Orbit lookup: unknown object vs unreachable service | `tests/ephem-network.test.js` |
+| Image downloads failed vs target off the image | `tests/coverage.test.js`; `tests/js/spacelapse-downloads.test.cjs` |
+| Moving-object index: empty vs partial vs failed | `tests/coverage.test.js`; `spacelapse-track-empty`, `-track-unreachable` |
+| Revisits reuse cutouts; failures and FLAGS errors retried; memory bounded | `tests/cutout-cache.test.js` |
+| Links point at the team repo (source, Report button) | `tests/repo-links.test.js` |
+
 ## Files
 
 | File | Covers |

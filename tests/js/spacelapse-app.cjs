@@ -40,6 +40,7 @@ function indexFetch(mutate, tile) {
   return async (url) => {
     if (url === "data/index.json") return { ok: true, json: async () => index };
     if (url.startsWith("data/tiles/")) return tile(url);
+    if (url.startsWith("data/tracks/")) { const buf = fs.readFileSync(path.join(ROOT, url)); return { ok: true, json: async () => JSON.parse(buf) }; }
     throw new Error(`offline: ${url}`);
   };
 }

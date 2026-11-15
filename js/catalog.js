@@ -33,7 +33,7 @@ export const DETECTORS = {
 let indexPromise = null;
 export function loadIndex() {
   indexPromise ??= fetch('data/index.json').then(r => {
-    if (!r.ok) throw new Error('Could not load the SPHEREx image index.');
+    if (!r.ok) throw new Error('Could not load the SPHEREx image index, so coverage is unknown. Search again to retry.');
     return r.json();
   });
   indexPromise.catch(() => { indexPromise = null; });
@@ -216,16 +216,33 @@ export async function findExposuresDetailed(ra, dec, signal) {
 // Exposures that caught a moving object. positionAt(mjd) -> {ra, dec, vmag} | null.
 // Each result carries the object's position at that exposure's time.
 export async function findAlongPath(points, positionAt, signal, onProgress) {
+  return (await findAlongPathDetailed(points, positionAt, signal, onProgress)).exposures;
+}
+
+// Like findAlongPath, but failed tiles are reported: {exposures, tiles, failedTiles}.
+// Throws only if every needed tile failed.
+export async function findAlongPathDetailed(points, positionAt, signal, onProgress) {
   const index = await withAbort(loadIndex(), signal);
   const keys = new Set();
   for (const p of points) for (const k of tilesNear(p.ra, p.dec, SEARCH_R, index.tileDeg)) if (index.tiles[k]) keys.add(k);
   const list = [...keys];
   const out = [];
-  let done = 0;
+  const failedTiles = [];
+  let done = 0, cause = null;
   const queue = [...list];
   const worker = async () => {
     while (queue.length) {
-      const buf = await loadTile(queue.shift(), signal);
+      const key = queue.shift();
+      let buf;
+      try {
+        buf = await loadTile(key, signal);
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        failedTiles.push(key);
+        cause ??= e;
+        onProgress?.(++done, list.length);
+        continue;
+      }
       const v = new DataView(buf);
       for (let o = 0; o + index.rowBytes <= buf.byteLength; o += index.rowBytes) {
         const mjd = v.getFloat32(o + 8, true) + index.mjd0;
@@ -238,5 +255,8 @@ export async function findAlongPath(points, positionAt, signal, onProgress) {
     }
   };
   await Promise.all(Array.from({ length: 8 }, worker));
-  return deduplicateExposures(out);
+  if (list.length && failedTiles.length === list.length) {
+    throw new Error(`Could not load the SPHEREx index along this path (${cause.message || cause}), so coverage is unknown. Search again to retry.`);
+  }
+  return { exposures: deduplicateExposures(out), tiles: list.length, failedTiles };
 }

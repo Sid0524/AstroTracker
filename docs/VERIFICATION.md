@@ -95,6 +95,15 @@ used a 3 arcmin circle. That explains the different counts.
 - **Browser check:** Barnard's Star showed 6 detector rows and 101 coverage marks
   (QR2 and QR3) in 3 survey windows. Clicking a D6 mark switched the detector to D6.
 
+### Revisiting a detector (SpaceLapse, Barnard's Star, 96 px field)
+
+| Step | Before cutout cache | With cutout cache |
+|---|---|---|
+| D3 first visit | 222 requests, 80.1 MB, 23 s | same |
+| D4 first visit | 176 requests, 62.9 MB, 18 s | same |
+| D3 again | 106 requests, 76.3 MB, 21 s | **0 requests, 0 MB, immediate** |
+| D4 again | (not measured) | **0 requests, 0 MB, immediate** |
+
 ## Retry benchmark in the browser UI (2026-11-14, 15:04-15:11 local)
 
 Twenty fixed targets were run through the real page. For each target the run set

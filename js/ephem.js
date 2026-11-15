@@ -24,8 +24,15 @@ async function query(prefixed, startMjd, days, signal) {
     '-observer': '500',
     '-mime': 'json',
   });
-  const r = await fetch(`${MIRIADE}?${q}`, { signal });
-  const d = await r.json();
+  let d;
+  try {
+    const r = await fetch(`${MIRIADE}?${q}`, { signal });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    d = await r.json();
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    throw Object.assign(new Error(e.message), { unreachable: true });
+  }
   if (!d.sso || !Array.isArray(d.data)) throw new Error(d.message || 'not found');
   return d;
 }
@@ -61,12 +68,14 @@ async function miriade(name, signal) {
   const start = SURVEY_START_MJD;
   const days = Date.now() / 864e5 + 40587 - start + 1;
   const tries = looksLikeComet(name) ? [`c:${name}`, `a:${name}`] : [`a:${name}`, `c:${name}`];
-  let d;
+  let d, unreachable = false;
   for (const t of tries) {
     try { d = await query(t.trim(), start, days, signal); break; } catch (e) {
-      if (signal?.aborted) throw e;
+      if (signal?.aborted || e.name === 'AbortError') throw e;
+      unreachable ||= !!e.unreachable;
     }
   }
+  if (!d && unreachable) throw new Error(`“${name}” could not be checked: the orbit service (IMCCE Miriade) is unavailable. Try again later.`);
   if (!d) throw new Error(`Couldn't find a comet or asteroid called “${name}”.`);
   const points = d.data.map(p => ({
     mjd: Date.parse(p.Date.endsWith('Z') ? p.Date : `${p.Date}Z`) / 864e5 + 40587,

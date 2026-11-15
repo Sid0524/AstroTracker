@@ -126,3 +126,68 @@ test('UI: a coverage click jumps to the loaded frame closest in time, earliest o
   assert.equal(nearestIndex(frames, 120), 1, 'tie between 110 and 130 keeps the earlier frame');
   assert.equal(nearestIndex([], 100), -1, 'nothing loaded yet: no jump');
 });
+
+// --- downloads and moving objects: missing data vs could not confirm --------
+import { noCutoutsMessage, partialDownloadMessage } from '../js/coverage.js';
+
+test('P1: when no cutouts load because downloads failed, say it is not confirmed missing data', () => {
+  const text = noCutoutsMessage([{ failed: true }, { failed: true }, { offImage: true }]);
+  assert.match(text, /^2 of 3 visits could not be downloaded/);
+  assert.match(text, /not confirmed as missing data/);
+});
+
+test('P1: when every visit is genuinely off the image, report no usable cutouts', () => {
+  assert.match(noCutoutsMessage([{ offImage: true }, {}]), /^No usable cutouts: the target is outside the usable image area/);
+});
+
+test('P1: visits with nothing downloaded are announced as missing from this view', () => {
+  assert.equal(partialDownloadMessage([{ failed: true, status: 'error' }, { status: 'ok' }, { status: 'ok' }]),
+    '1 of 3 visits could not be downloaded; it is missing from this view, not confirmed missing from the archive. Search again to retry.');
+  assert.match(partialDownloadMessage([{ failed: true, status: 'error' }, { failed: true, status: 'error' }, { status: 'ok' }]),
+    /^2 of 3 visits could not be downloaded; they are missing/);
+});
+
+test('P1: visits shown with some exposures missing are not called missing', () => {
+  const text = partialDownloadMessage([{ failed: true, status: 'ok' }, { status: 'ok' }]);
+  assert.equal(text, '1 of 2 visits is shown with fewer exposures because some downloads failed. Search again to retry.');
+  assert.match(partialDownloadMessage([{ failed: true, status: 'ok' }, { failed: true, status: 'ok' }, {}]), /^2 of 3 visits are shown with fewer exposures/);
+  assert.match(partialDownloadMessage([{ failed: true, status: 'error' }, { failed: true, status: 'ok' }, {}]),
+    /^1 of 3 visits could not be downloaded; it is missing.*1 more is shown with fewer exposures/);
+});
+
+test('P1: no failed downloads means no message', () => {
+  assert.equal(partialDownloadMessage([{ status: 'ok' }, { status: 'off' }]), '');
+});
+
+test('P1: the empty-coverage message can name a moving object instead of a position', () => {
+  assert.match(noCoverageMessage(summary(['qr3/a']), '3I/ATLAS along its path'), /^No SPHEREx exposures of 3I\/ATLAS along its path in the index/);
+});
+
+test('P1: a path search keeps results from good tiles and reports failed ones', async t => {
+  const { findAlongPathDetailed } = await import('../js/catalog.js?path-partial');
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url === 'data/index.json') return { ok: true, json: async () => tileIndex() };
+    if (url.endsWith('18_71.bin')) return { ok: false, status: 503 };
+    return { ok: true, arrayBuffer: async () => oneRow() };
+  });
+  const found = await findAlongPathDetailed([{ ra: 0, dec: 0 }], () => ({ ra: 0, dec: 0 }));
+  assert.deepEqual(found.failedTiles, ['18_71']);
+  assert.equal(found.tiles, 2);
+  assert.equal(found.exposures.length, 1);
+});
+
+test('P1: a path search with every tile failing says coverage is unknown', async t => {
+  const { findAlongPathDetailed } = await import('../js/catalog.js?path-allfail');
+  t.mock.method(globalThis, 'fetch', async url => (url === 'data/index.json'
+    ? { ok: true, json: async () => tileIndex() } : { ok: false, status: 500 }));
+  await assert.rejects(findAlongPathDetailed([{ ra: 0, dec: 0 }], () => ({ ra: 0, dec: 0 })), /coverage is unknown/);
+});
+
+test('P1: cancelling a path search still cancels', async t => {
+  const { findAlongPathDetailed } = await import('../js/catalog.js?path-abort');
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url === 'data/index.json') return { ok: true, json: async () => tileIndex() };
+    throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+  });
+  await assert.rejects(findAlongPathDetailed([{ ra: 0, dec: 0 }], () => ({ ra: 0, dec: 0 })), { name: 'AbortError' });
+});

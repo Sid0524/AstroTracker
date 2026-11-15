@@ -30,7 +30,15 @@ function check(ra, dec) {
 export async function resolve(input, signal) {
   const c = parseCoords(input);
   if (c) return { ra: c[0], dec: c[1], name: null };
-  const res = await fetch(SESAME + encodeURIComponent(input.trim()), { signal });
+  const unreachable = `The name "${input.trim()}" could not be checked: the name service (CDS Sesame) is unavailable. Try again, or enter RA Dec in degrees.`;
+  let res;
+  try {
+    res = await fetch(SESAME + encodeURIComponent(input.trim()), { signal });
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    throw new Error(unreachable);
+  }
+  if (!res.ok) throw new Error(unreachable);
   const doc = new DOMParser().parseFromString(await res.text(), 'application/xml');
   const ra = doc.querySelector('jradeg'), dec = doc.querySelector('jdedeg');
   if (!ra || !dec) throw new Error(`Couldn't find "${input}". Try another name or enter RA Dec in degrees.`);

@@ -1,6 +1,6 @@
 import { resolve, formatRA, formatDec } from './resolve.js';
-import { findExposuresDetailed, findAlongPath, DETECTORS, loadIndex, summarizeIndex } from './catalog.js';
-import { renderCoverage, coverageSummary, noCoverageMessage, partialCoverageMessage, nearestIndex } from './coverage.js';
+import { findExposuresDetailed, findAlongPathDetailed, DETECTORS, loadIndex, summarizeIndex } from './catalog.js';
+import { renderCoverage, coverageSummary, noCoverageMessage, partialCoverageMessage, nearestIndex, noCutoutsMessage, partialDownloadMessage } from './coverage.js';
 import { ephemeris, positionAt } from './ephem.js';
 import { makeCutout, PIXEL_ARCSEC } from './cutout.js';
 import { tanDeproject, tanProject, D2R } from './wcs.js';
@@ -243,10 +243,12 @@ async function trackObject(name, opts, abort) {
     if (abort.signal.aborted) return;
     setLoading(`Searching SPHEREx images along the path of ${eph.name}…`);
     const at = mjd => positionAt(eph.points, mjd);
-    const exps = await findAlongPath(eph.points, at, abort.signal, (d, n) => {
+    const found = await findAlongPathDetailed(eph.points, at, abort.signal, (d, n) => {
       $('loadingText').textContent = `Searching SPHEREx images along the path of ${eph.name}… ${Math.round((100 * d) / n)}%`;
     });
     if (abort.signal.aborted) return;
+    archiveIndex ??= await loadIndex();
+    const exps = found.exposures;
     state.track = { ...eph, query: name };
     renderModes();
     $('trackNote').hidden = false;
@@ -255,14 +257,15 @@ async function trackObject(name, opts, abort) {
       : 'Positions from IMCCE Miriade. Comet predictions can be off by a minute of arc or two; if the object isn’t at the centre, try a wider field of view.';
     if (!eph.precise && !opts.size && eph.kind === 'comet') { state.size = 160; renderSizes(); }
     state.exposures = exps;
-    state.coverageNote = '';
+    state.coverageNote = found.failedTiles.length ? partialCoverageMessage(found.failedTiles.length, found.tiles) : '';
+    if (state.coverageNote) toast(state.coverageNote);
     $('changes').hidden = true;
     $('targetName').textContent = eph.name;
     $('targetCoords').textContent = `Moving ${eph.kind || 'object'}`;
     document.title = `${eph.name} · SPHEREx Time-Lapse`;
     if (!exps.length) {
       setLoading('');
-      toast(`SPHEREx hasn’t released any images of ${eph.name} yet.`);
+      if (!state.coverageNote) toast(noCoverageMessage(indexSummary(), `${eph.name} along its path`));
       state.target = null;
       renderBands();
       return;
@@ -435,10 +438,12 @@ async function loadBand() {
   renderWaveStatus();
   renderTargetGuide();
   if (!n) {
-    toast(allLoaded().length ? 'No visits match the wavelength window. Widen it or choose All wavelengths.' : 'No usable cutouts loaded. Check the inspector, try a wider field or another detector.');
+    toast(allLoaded().length ? 'No visits match the wavelength window. Widen it or choose All wavelengths.' : noCutoutsMessage(state.frames));
     if (!list.length) $('qualityNote').textContent = 'No indexed exposures in the requested detector. Choose a different detector; the saved detector was not substituted.';
     return;
   }
+  const downloadNote = partialDownloadMessage(state.frames);
+  if (downloadNote) toast(downloadNote);
   if (state.restoreFailed || state.restoredEpoch) return;
   if (state.mode === 'play' && n > 1) play();
 }
@@ -877,7 +882,7 @@ function compass(vx, vy) {
 
 // ---------- reporting ----------
 
-const ISSUES = 'https://github.com/ShivenKhurana1/spherex-timelapse/issues/new';
+const ISSUES = 'https://github.com/Sid0524/AstroTracker/issues/new';
 
 function pixSky(x, y) {
   const n = state.size, s = (PIXEL_ARCSEC / 3600) * D2R, half = (n - 1) / 2;

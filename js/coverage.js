@@ -53,14 +53,33 @@ function scope(summary) {
 }
 
 // Empty search: a real "no coverage" for the searched releases, never a claim about SPHEREx as a whole.
-export function noCoverageMessage(summary) {
+export function noCoverageMessage(summary, subject = 'this position') {
   const s = scope(summary);
-  return `No SPHEREx exposures of this position in the index (searched ${s.searched}; ${s.date}).${s.dr1}`;
+  return `No SPHEREx exposures of ${subject} in the index (searched ${s.searched}; ${s.date}).${s.dr1}`;
 }
 
 // Some index tiles failed: results are incomplete, so coverage is partly unknown.
 export function partialCoverageMessage(failed, total) {
   return `Coverage incomplete: ${failed} of ${plural(total, 'index tile')} failed to load, so some dates may be missing. Search again to retry.`;
+}
+
+// No cutouts loaded: failed downloads are "not confirmed", only off-image visits are "no usable cutouts".
+export function noCutoutsMessage(frames) {
+  const failed = frames.filter(f => f.failed).length;
+  if (failed) return `${failed} of ${plural(frames.length, 'visit')} could not be downloaded (network or archive error), so this is not confirmed as missing data. Search again to retry.`;
+  return 'No usable cutouts: the target is outside the usable image area in every visit. Try a wider field or another detector.';
+}
+
+// After loading: visits with nothing downloaded are missing from this view;
+// visits with some failed exposures are still shown, with fewer exposures. '' if none failed.
+export function partialDownloadMessage(frames) {
+  const missing = frames.filter(f => f.failed && f.status === 'error').length;
+  const reduced = frames.filter(f => f.failed && f.status !== 'error').length;
+  if (!missing && !reduced) return '';
+  const n = frames.length;
+  if (!missing) return `${reduced} of ${plural(n, 'visit')} ${reduced === 1 ? 'is' : 'are'} shown with fewer exposures because some downloads failed. Search again to retry.`;
+  const more = reduced ? ` ${reduced} more ${reduced === 1 ? 'is' : 'are'} shown with fewer exposures.` : '';
+  return `${missing} of ${plural(n, 'visit')} could not be downloaded; ${missing === 1 ? 'it is' : 'they are'} missing from this view, not confirmed missing from the archive.${more} Search again to retry.`;
 }
 
 // One line describing what was found and from which releases.

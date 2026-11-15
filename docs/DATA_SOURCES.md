@@ -127,6 +127,14 @@ returns 422 without trying IRSA.
   - DR1 fills in over several weekly runs.
   - QR2 entries are superseded processing until DR1 replaces them.
   - A footprint match is not guaranteed usable pixels.
+- **No data vs could not confirm:** "No SPHEREx exposures… in the index" only
+  when every lookup succeeded. Failed index tiles, image downloads, name lookups
+  (CDS Sesame) or orbit lookups (IMCCE Miriade) say the result could not be
+  confirmed or checked, never "not found".
+- **Cutout cache:** finished cutouts are kept in memory (LRU, 150 MB) for the
+  life of the page, so revisiting a detector or date downloads nothing.
+  Failed downloads and cutouts with a FLAGS error are not kept. Archive file
+  names include the processing version, so a cached cutout never goes stale.
 - **Rebuilding:** see [INDEX_REBUILD.md](INDEX_REBUILD.md).
 - **Builder reliability:** `--max-minutes` stops starting new folders when time
   runs out. Failed and deferred folders stay incomplete for the next run, and
