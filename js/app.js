@@ -1,5 +1,6 @@
 import { resolve, formatRA, formatDec } from './resolve.js';
 import { findExposuresDetailed, findAlongPathDetailed, DETECTORS, loadIndex, summarizeIndex } from './catalog.js';
+import { initAssistant } from './assistant.js';
 import { renderCoverage, coverageSummary, noCoverageMessage, partialCoverageMessage, nearestIndex, noCutoutsMessage, partialDownloadMessage } from './coverage.js';
 import { ephemeris, positionAt } from './ephem.js';
 import { makeCutout, PIXEL_ARCSEC } from './cutout.js';
@@ -1877,6 +1878,18 @@ function renderCoverageChart() {
   $('coverageWarning').textContent = state.coverageNote || '';
 }
 
+// Compact summary of what is on screen, sent with assistant questions.
+function assistantView() {
+  const ok = state.frames.filter(f => f.status === 'ok'), cur = currentFrame(), day = d => (d ? new Date(d).toISOString().slice(0, 10) : null);
+  const det = DETECTORS[state.band];
+  return {
+    target: state.target ? { name: state.target.name || 'Custom position', ra: state.target.ra, dec: state.target.dec, moving: !!state.target.moving } : null,
+    detector: det ? `${det.name} (${det.range})` : null, viewMode: state.mode, fieldPixels: state.size,
+    framesLoaded: ok.length, firstDate: day(ok[0]?.date), lastDate: day(ok.at(-1)?.date), currentDate: day(cur?.date),
+    coverage: $('coverageSummary').textContent, coverageWarning: state.coverageNote || '',
+  };
+}
+
 // Coverage chart click: switch detector, or jump to the nearest loaded date.
 function pickCoverage(detector, mjd) {
   if (detector !== state.band) { state.band = detector; renderBands(); loadBand(); return; }
@@ -2120,6 +2133,8 @@ function fromHash() {
 renderModes();
 renderSizes();
 fromHash();
+
+initAssistant($('assistant'), { getView: assistantView });
 
 loadIndex().then(ix => {
   archiveIndex = ix;

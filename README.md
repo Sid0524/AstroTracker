@@ -35,6 +35,7 @@ No install, no account, no backend. Everything runs in the browser.
   issue (labelled `candidate`) with its position, date, images and a link to the view.
 - **Archive coverage:** dates by detector and release, with the releases searched and
   index date. Failed index tiles show as incomplete coverage, not as "no images".
+- **Ask about this view:** plain-language AI answers about what is on screen (OpenAI first, OpenRouter fallback; see [docs/ASSISTANT.md](docs/ASSISTANT.md)).
 - **Known asteroids** labelled on each frame, from IMCCE's SkyBoT service.
 - **Light curves and spectra:** click any star to plot its brightness at every visit,
   or switch to *Spectrum* to measure it in every exposure across all six bands and
