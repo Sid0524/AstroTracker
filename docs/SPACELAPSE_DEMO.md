@@ -25,16 +25,15 @@ A short walk-through of the SpaceLapse page (the root `index.html`), using Barna
 
    Skip the `git switch` line once this branch is merged into `main`.
 
-2. **Serve the page.** There is no virtual environment and no install step. The README uses `python3 -m http.server 8000`.
+2. **Serve the page.** There is no virtual environment and no install step. The README serves it with `python3 -m http.server`; this demo uses port 8765.
 
    ```powershell
-   python -m http.server 8000
+   python -m http.server 8765
    ```
 
-   Open <http://localhost:8000> and leave this terminal open. Press Ctrl+C to stop it.
+   Open <http://localhost:8765> and leave this terminal open. Press Ctrl+C to stop it.
 
-   - The Flask viewer also uses port 8000, so run only one of them at a time.
-   - **Unverified:** the `python` command on Windows PowerShell. The README only shows `python3`.
+   - The Flask viewer also uses port 8000, so run only one at a time.
 
 3. **Look at the start page.** You will see a hero section with "Choose a target" and "Search the sky" buttons, and a simulated before-and-after slider labelled "Simulated example · not real sky data". The slider is a teaching aid. It does not show real SPHEREx images.
 
