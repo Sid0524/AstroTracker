@@ -7,6 +7,7 @@
   <title>SPHEREx | Sky in motion</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/timeline.js" defer></script>
+  <script src="/static/gaia.js" defer></script>
   <script src="/static/viewer.js" defer></script>
 </head>
 <body>
@@ -63,11 +64,24 @@
         <div class="viewer-top"><span class="eyebrow">03 / INSPECT THE SKY</span><span id="field-label" class="tiny">NORTH UP / EAST LEFT</span></div>
         <div class="image-stage">
           <canvas id="sky" width="128" height="128" aria-label="Aligned infrared image"></canvas>
+          <svg id="gaia-overlay" class="gaia-overlay" viewBox="0 0 128 128" aria-hidden="true"></svg>
           <div class="compass" aria-hidden="true"><span>N &#8593;</span><span>E &#8592;</span></div>
           <div class="crosshair" aria-hidden="true"></div>
           <div id="empty-state" class="empty-state"><div class="orbit" aria-hidden="true"></div><h2>A window into the infrared</h2><p>Start with Barnard's Star or enter any sky coordinates.<br>Images are fetched only when you load a selection.</p></div>
           <div id="image-badge" class="image-badge" hidden></div>
           <div id="scale" class="scale" hidden></div>
+        </div>
+        <div class="gaia-controls">
+          <label class="check"><input id="gaia-toggle" type="checkbox"> Gaia DR3 overlay</label>
+          <div id="gaia-panel" class="gaia-panel" hidden>
+            <span id="gaia-status" class="gaia-status" role="status" aria-live="polite"></span>
+            <button id="gaia-action" type="button" hidden>Query Gaia</button>
+            <ul class="gaia-legend" aria-label="Gaia legend">
+              <li><span class="gaia-swatch" aria-hidden="true"></span>Gaia DR3 catalog positions (no detections implied)</li>
+              <li><span class="gaia-swatch no-pm" aria-hidden="true"></span>Dashed: no proper motion, J2016.0 position</li>
+            </ul>
+            <p id="gaia-provenance" class="gaia-provenance"></p>
+          </div>
         </div>
         <div id="status" class="status" role="status" aria-live="polite">Ready to search. No simulated imagery.</div>
         <div id="warnings" class="warnings" role="alert" hidden></div>

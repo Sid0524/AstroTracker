@@ -83,7 +83,8 @@ test("O1/C: search sends RA/Dec, FOV, release and deep flag, then makes the URL 
   await search(app);
   const params = new URLSearchParams(fake.calls[0].split("?")[1]);
   assert.deepEqual(Object.fromEntries(params), { ra: "330.84", dec: "-56.786", fov: "12", release: "dr1", deep: "1" });
-  assert.equal(new URL(app.w.location.href).search, `?${params}`);
+  // The search parameters come first and unchanged; P3 appends band/select for the current selection.
+  assert.ok(new URL(app.w.location.href).search.startsWith(`?${params}&band=`), app.w.location.href);
   assert.equal(app.$("field-label").textContent, "269.4463, 4.7682 / ICRS", "4-decimal rounding of the searched center");
 });
 
@@ -402,4 +403,185 @@ test("UI: UI text uses correct singular/plural wording for one exposure, date an
   assert.equal(app.$("selection-summary").textContent, "1 exposure / 1 calendar date / 1 selected");
   await load(app);
   assert.match(app.$("status").textContent, /^1 aligned frame ready in /);
+});
+
+// ------------------------------------------------------------- P3 Gaia overlay
+
+const VIZIER = "https://vizier.cfa.harvard.edu/viz-bin/asu-tsv";
+// One Gaia source at the Barnard field center, with zero proper motion so it stays in view.
+const GAIA_ROWS = "#Table\tI_355_gaiadr3:\n_r\tSource\tRA_ICRS\tDE_ICRS\tpmRA\tpmDE\n0.00\t111\t269.446268\t4.768204\t0\t0\n";
+
+// Routes VizieR URLs to a fake catalog and everything else to the fake /api backend.
+function withVizier(fake, body = GAIA_ROWS) {
+  const vizier = [];
+  const fetch = async (url, init) => {
+    if (url.startsWith(VIZIER)) { vizier.push(url); return { ok: true, status: 200, text: async () => body }; }
+    return fake.fetch(url, init);
+  };
+  return { fetch, calls: fake.calls, vizier };
+}
+
+test("P3: no request on page load, even when a shared link restores gaia=1", async () => {
+  const requests = [];
+  const app = loadApp({
+    url: "http://localhost:8000/?ra=269.446268&dec=4.768204&fov=3&release=both&deep=0&gaia=1",
+    fetch: async (url) => { requests.push(url); throw new Error("no request expected on page load"); },
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(requests, [], "neither /api nor VizieR is contacted");
+  assert.equal(app.$("gaia-toggle").checked, true, "the toggle is restored");
+  assert.equal(app.$("gaia-panel").hidden, false);
+  assert.equal(app.$("gaia-status").textContent, "Gaia not queried yet. Search a field first.");
+  assert.equal(app.$("gaia-action").hidden, false);
+  assert.equal(app.$("gaia-action").textContent, "Query Gaia");
+  assert.equal(app.$("gaia-overlay").querySelectorAll("circle").length, 0);
+  assert.equal(app.$("fov").value, "3", "the other shared parameters still prefill the form");
+  assert.equal(app.$("release").value, "both");
+
+  const plain = loadApp({ url: "http://localhost:8000/?ra=1&dec=2", fetch: async (url) => { requests.push(url); } });
+  assert.equal(plain.$("gaia-toggle").checked, false, "the overlay is off by default");
+  assert.equal(plain.$("gaia-panel").hidden, true);
+  assert.deepEqual(requests, []);
+});
+
+test("P3: a search with gaia=1 waits for Query Gaia, shares gaia=1, and a new search does not re-query", async () => {
+  let center = {};
+  const fake = withVizier(fakeFetch({
+    search: () => [200, searchBody(barnardRecords(), undefined, center)],
+    frame: (id) => [200, frameBody(id)],
+  }));
+  const app = loadApp({ url: "http://localhost:8000/?gaia=1", fetch: fake.fetch });
+  await search(app);
+  assert.equal(fake.vizier.length, 0, "the search itself does not query Gaia");
+  assert.equal(app.$("gaia-status").textContent, "Gaia not queried yet.");
+  assert.equal(new URL(app.w.location.href).searchParams.get("gaia"), "1");
+  assert.equal(new URLSearchParams(fake.calls[0].split("?")[1]).has("gaia"), false, "gaia is not sent to /api/search");
+
+  click(app.w, app.$("gaia-action"));
+  await until(() => /^1 Gaia DR3 source in the query cone\.$/.test(app.$("gaia-status").textContent), "Gaia result");
+  assert.equal(fake.vizier.length, 1);
+  await load(app);
+  assert.equal(app.$("gaia-overlay").querySelectorAll("circle").length, 1, "a marker is drawn once a frame is displayed");
+  assert.match(app.$("gaia-provenance").textContent,
+    /^Gaia DR3 \(I\/355\/gaiadr3\), queried via VizieR ASU on \d{4}-\d{2}-\d{2} UTC, linear proper-motion propagation to \d{4}-\d{2}-\d{2} \(\d{4}\.\d{3}\)\.$/);
+
+  center = { ra: 270, dec: 5 }; // a different field
+  await search(app);
+  assert.equal(fake.vizier.length, 1, "a new search does not query again by itself");
+  assert.equal(app.$("gaia-status").textContent, "Gaia not queried yet.");
+  assert.equal(app.$("gaia-overlay").querySelectorAll("circle").length, 0);
+
+  center = {}; // back to the first field: shown from cache, still no request
+  await search(app);
+  assert.equal(fake.vizier.length, 1);
+  assert.match(app.$("gaia-status").textContent, /^1 Gaia DR3 source in the query cone\./);
+});
+
+// ------------------------------------------------------------- P3 shared selection
+
+const KEYS_32 = Array.from({ length: 40 }, (_, i) => `2025W33_2C_${String(i).padStart(4, "0")}_1D3`);
+
+test("P3: exposureKey is the exposure ID plus the detector number", () => {
+  const { viewer } = loadApp();
+  assert.equal(viewer.exposureKey({ observation: "2025W33_2C_0321_1", band: "SPHEREx-D3" }), "2025W33_2C_0321_1D3");
+  assert.equal(viewer.exposureKey(rec(7, { band: "SPHEREx-D6" })), "obs7D6");
+});
+
+test("P3: parseSharedSelection drops invalid bands and malformed or repeated keys, keeping at most 32", () => {
+  const { viewer } = loadApp();
+  const parse = (query) => viewer.parseSharedSelection(new URLSearchParams(query));
+  assert.deepEqual(parse(""), { band: null, keys: [] }, "missing parameters");
+  assert.deepEqual(parse("band=D3&select=2025W33_2C_0321_1D3,2025W33_2C_0321_2D3"),
+    { band: "D3", keys: ["2025W33_2C_0321_1D3", "2025W33_2C_0321_2D3"] });
+  for (const band of ["D0", "D7", "d3", "SPHEREx-D3", "D3x", ""]) assert.equal(parse(`band=${band}`).band, null, band);
+  assert.deepEqual(parse("select=obs1D1,,obs1D1, obs2D2 ,obs3D9,../x,obs 4D1,noDetector,obs5D1%2Cobs6D1").keys,
+    ["obs1D1", "obs2D2", "obs5D1", "obs6D1"], "blank, repeated, wrong detector, path-like and spaced keys are dropped");
+  assert.deepEqual(parse(`select=${KEYS_32.join(",")}`).keys, KEYS_32.slice(0, 32));
+});
+
+test("P3: serializeSelection writes D-numbered band and a comma list, and round-trips through the parser", () => {
+  const { viewer } = loadApp();
+  const out = viewer.serializeSelection("SPHEREx-D3", ["obs1D3", "obs2D3", "obs1D3", "bad key"]);
+  assert.deepEqual(Object.fromEntries(out), { band: "D3", select: "obs1D3,obs2D3" });
+  assert.deepEqual(Object.fromEntries(viewer.serializeSelection("D2", [])), { band: "D2" }, "no select when nothing is selected");
+  assert.deepEqual(Object.fromEntries(viewer.serializeSelection("SPHEREx-D9", ["obs1D1"])), { select: "obs1D1" });
+  assert.deepEqual(Object.fromEntries(viewer.serializeSelection(null, [])), {});
+  assert.equal(viewer.serializeSelection("D3", KEYS_32).get("select").split(",").length, 32);
+  const back = viewer.parseSharedSelection(viewer.serializeSelection("SPHEREx-D1", ["obs1D1", "obs4D1"]));
+  assert.deepEqual(back, { band: "D1", keys: ["obs1D1", "obs4D1"] });
+});
+
+test("P3: link with select= makes no request on load", async () => {
+  const requests = [];
+  const app = loadApp({
+    url: "http://localhost:8000/?ra=269.446268&dec=4.768204&fov=3&release=both&deep=0&band=D1&select=obs1D1,obs4D1",
+    fetch: async (url) => { requests.push(url); throw new Error("no request expected on page load"); },
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(requests, []);
+  assert.equal(app.$("ra").value, "269.446268", "the form is filled");
+  assert.equal(app.viewer.state.selected.size, 0, "the selection waits for Search");
+  assert.equal(app.$("load").disabled, true);
+  assert.match(app.$("status").textContent, /^This link includes 2 selected exposures\. Click Search to restore the selection/);
+  assert.equal(app.$("status").classList.contains("error"), false);
+});
+
+test("P3: after Search the linked exposures are selected, unknown keys are ignored, and nothing loads by itself", async () => {
+  const fake = backend();
+  const app = loadApp({ url: "http://localhost:8000/?band=D1&select=obs1D1,obs4D1,nopeD1", fetch: fake.fetch });
+  await search(app);
+  assert.deepEqual([...app.viewer.state.selected], ["1", "4"]);
+  assert.match(app.$("status").textContent, /Restored 2 of 3 linked exposures\. Click Load selected to fetch them\.$/);
+  assert.equal(app.$("status").classList.contains("error"), false, "a missing key is not an error");
+  assert.equal(fake.calls.length, 1, "only /api/search; no cutouts until Load");
+  const url = new URL(app.w.location.href);
+  assert.equal(url.searchParams.get("band"), "D1");
+  assert.match(url.search, /&select=obs1D1,obs4D1$/, "readable comma list of the restored keys");
+
+  await search(app); // the pending selection is used once
+  assert.deepEqual([...app.viewer.state.selected], ["0", "4"], "default first/last dates on the next search");
+  assert.match(app.$("status").textContent, /Load the selected first\/last dates to compare\.$/);
+});
+
+test("P3: a linked band switches the detector before its keys are matched", async () => {
+  const app = loadApp({ url: "http://localhost:8000/?band=D3&select=obs3D3", fetch: backend().fetch });
+  await search(app);
+  assert.equal(app.$("band").value, "SPHEREx-D3");
+  assert.deepEqual([...app.viewer.state.selected], ["3"]);
+  assert.match(app.$("status").textContent, /Restored 1 linked exposure\. Click Load selected to fetch it\.$/);
+});
+
+test("P3: when no linked key is found the default first/last dates are used", async () => {
+  const app = loadApp({ url: "http://localhost:8000/?band=D1&select=zzzD1", fetch: backend().fetch });
+  await search(app);
+  assert.deepEqual([...app.viewer.state.selected], ["0", "4"]);
+  assert.match(app.$("status").textContent, /Restored 0 of 1 linked exposures\. Load the selected first\/last dates to compare\.$/);
+  assert.equal(app.$("status").classList.contains("error"), false);
+});
+
+test("P3: a malformed link is ignored silently and the defaults apply", async () => {
+  const app = loadApp({ url: "http://localhost:8000/?band=D9&select=,,bad%20key", fetch: backend().fetch });
+  assert.equal(app.$("status").textContent, "Ready to search. No simulated imagery.");
+  await search(app);
+  assert.equal(app.$("band").value, "SPHEREx-D1");
+  assert.deepEqual([...app.viewer.state.selected], ["0", "4"]);
+});
+
+test("P3: the URL follows selection and band changes with no request", async () => {
+  const fake = backend();
+  const app = loadApp({ fetch: fake.fetch });
+  await search(app);
+  const shared = () => new URL(app.w.location.href).searchParams;
+  assert.equal(shared().get("select"), "obs0D1,obs4D1", "the default pick is shareable");
+  const first = tableChecks(app)[0];
+  first.checked = false;
+  first.dispatchEvent(new app.w.Event("change", { bubbles: true }));
+  assert.equal(shared().get("select"), "obs4D1");
+  change(app, "band", "SPHEREx-D3");
+  assert.equal(shared().get("band"), "D3");
+  assert.equal(shared().get("select"), "obs3D3");
+  for (const box of tableChecks(app)) { box.checked = false; box.dispatchEvent(new app.w.Event("change", { bubbles: true })); }
+  assert.equal(shared().has("select"), false, "an empty selection drops select");
+  assert.equal(shared().get("ra"), "269.446268", "search parameters stay as searched");
+  assert.equal(fake.calls.length, 1, "URL updates never contact the server");
 });
