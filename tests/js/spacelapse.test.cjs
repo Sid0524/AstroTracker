@@ -52,3 +52,25 @@ test("P1: no exposures clears the chart", async () => {
   renderCoverage(root, { exposures: [], band: 1 });
   assert.equal(root.children.length, 0);
 });
+
+test("UI: tapping near a mark selects the nearest one within 20 px; far taps do nothing", async () => {
+  const { renderCoverage } = await coverage();
+  const { document, MouseEvent } = new JSDOM("<div id=c></div>").window;
+  const root = document.getElementById("c");
+  const picks = [];
+  renderCoverage(root, { exposures: [exp(60900), exp(60950), exp(61000)], band: 1, onPick: (d, m) => picks.push(m) });
+  const lane = root.querySelector(".cov-lane");
+  lane.getBoundingClientRect = () => ({ left: 0, width: 400, top: 0, height: 28 });
+  const marks = [...lane.querySelectorAll(".cov-mark")];
+  const xOf = (m) => (Number.parseFloat(m.style.left) / 100) * 400;
+  const tap = (x) => lane.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: 10 }));
+  tap(xOf(marks[1]) + 12);
+  assert.deepEqual(picks, [60950], "nearest mark picked");
+  tap(xOf(marks[0]) - 15);
+  assert.deepEqual(picks, [60950, 60900]);
+  tap((xOf(marks[0]) + xOf(marks[1])) / 2);
+  assert.equal(picks.length, 2, "more than 20 px from every mark: nothing");
+  marks[2].click();
+  assert.deepEqual(picks.at(-1), 61000, "a direct tap on a mark picks that mark once");
+  assert.equal(picks.length, 3);
+});

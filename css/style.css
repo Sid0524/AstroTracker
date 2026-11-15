@@ -559,3 +559,8 @@ dialog input[type=text], dialog input[type=number] {
 .cov-key:first-child { margin-left: 0; }
 .cov-key.window { background: rgba(125,229,211,.12); border: 1px solid rgba(125,229,211,.3); }
 .coverage-warning { color: #f2d09c; }
+/* Touch: taller rows; taps select the nearest mark (see coverage.js) */
+@media (pointer: coarse) {
+  .cov-lane { height: 28px; cursor: pointer; }
+  .cov-mark { top: 6px; height: 16px; }
+}

@@ -4,6 +4,7 @@
 export const DETECTOR_IDS = [1, 2, 3, 4, 5, 6];
 const WINDOW_GAP_DAYS = 30;
 const DAY_MS = 86400000;
+const TAP_PX = 20; // a tap this close to a mark selects it (marks are 4 px wide)
 
 // Release of an exposure: decodeRow sets `release`; fall back to the S3 path.
 export function releaseOf(exposure) {
@@ -136,6 +137,17 @@ export function renderCoverage(root, { exposures, band, detectors = {}, onPick }
       mark.addEventListener('click', () => onPick?.(det, g.mjd));
       lane.append(mark);
     }
+    // Taps between marks select the nearest one within TAP_PX (fingers are wider than marks).
+    lane.addEventListener('click', e => {
+      if (e.target.closest?.('.cov-mark')) return;
+      const box = lane.getBoundingClientRect();
+      let best = null, bestPx = TAP_PX;
+      for (const m of lane.querySelectorAll('.cov-mark')) {
+        const px = Math.abs(box.left + (Number.parseFloat(m.style.left) / 100) * box.width - e.clientX);
+        if (px <= bestPx) { best = m; bestPx = px; }
+      }
+      best?.click();
+    });
     row.append(name, lane);
     root.append(row);
   }

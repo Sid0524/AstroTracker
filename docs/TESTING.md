@@ -37,6 +37,26 @@ tracked 3I/ATLAS. Not yet seen running on GitHub: `tests.yml` and the
 Out of Person 1 scope: image addition/subtraction (Person 2), catalog overlays
 and sharing (Person 3).
 
+### Pre-PR path check (2026-11-15)
+
+All paths below passed in the browser with no console errors:
+
+| Path | Result |
+|---|---|
+| Five challenge target cards | All load, each with its guide; WISE 0855 caveat shows the 2 arcmin offset |
+| Name search (M42, live CDS Sesame) | Resolved and loaded |
+| Coordinates: decimal and sexagesimal | Loaded |
+| Unknown name | "Couldn't find" |
+| Out-of-range coordinates ("999 999") | Was "Couldn't find"; now a range message (fixed, test first) |
+| Moving objects: 3I/ATLAS (built-in), 2024 YR4 (live Miriade) | Loaded along their paths |
+| Share link round trip | Detector, view and both blink dates restored |
+| Cache: detector away and back, same target again, field size back | 0 requests each time; a new field size downloads, as designed |
+| Phone (375 px) | No sideways scrolling. Coverage marks were too small to tap: rows are now 28 px on touch screens, and a tap selects the nearest mark within 20 px (fixed, test first) |
+
+Asset versions were bumped to `?v=31` (`index.html`), so returning visitors
+get the new CSS and app code. Bump it again whenever `css/style.css` or
+`js/app.js` changes.
+
 ### SpaceLapse walkthrough (2026-11-14)
 
 Every control was exercised in the browser, except PNG, Video and Export JSON

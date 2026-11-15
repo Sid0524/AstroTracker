@@ -191,3 +191,11 @@ test('P1: cancelling a path search still cancels', async t => {
   });
   await assert.rejects(findAlongPathDetailed([{ ra: 0, dec: 0 }], () => ({ ra: 0, dec: 0 })), { name: 'AbortError' });
 });
+
+test('UI: coverage rows are taller on touch screens', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../css/style.css', import.meta.url), 'utf8');
+  const block = css.slice(css.indexOf('@media (pointer: coarse)', css.indexOf('Archive coverage')));
+  assert.match(block, /\.cov-lane\s*\{[^}]*height:\s*(2[4-9]|[3-9]\d)px/);
+  assert.doesNotMatch(css, /\.cov-mark::before/, 'no overlapping invisible hit areas');
+});

@@ -45,3 +45,13 @@ test("O1: coordinates skip the name service entirely", async () => {
   globalThis.fetch = async () => { throw new Error("should not be called"); };
   assert.deepEqual(await resolve("83.82 -5.39"), { ra: 83.82, dec: -5.39, name: null });
 });
+
+test("O1: coordinates outside the sky are rejected with a range message, not sent as a name", async () => {
+  const { resolve } = await load();
+  let called = false;
+  globalThis.fetch = async () => { called = true; return { ok: true, status: 200, text: async () => "" }; };
+  for (const input of ["999 999", "360 0", "10 -91", "24:00:00 +00:00:00"]) {
+    await assert.rejects(resolve(input), /out of range: RA must be 0 to 360 degrees.*Dec -90 to \+90/, input);
+  }
+  assert.equal(called, false, "the name service is not asked");
+});
