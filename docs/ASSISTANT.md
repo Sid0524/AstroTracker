@@ -1,10 +1,16 @@
-# "Ask about this view" assistant
+# "Ask SpaceLapse" assistant
 
-A panel in SpaceLapse, under the filmstrip, answers plain-language questions
-about what is on screen. The browser sends the question plus a short summary of
+A floating **Ask SpaceLapse** button in SpaceLapse opens a drawer (a bottom
+sheet on phones) that answers plain-language questions about what is on screen
+and how to use the app. The browser sends the question plus a short summary of
 the view: target, detector, dates, and the coverage summary. A Vercel Function
 (`api/ask.js`) forwards it to an AI model and returns plain text, labelled with
 the model that wrote it.
+
+## What it knows
+
+- **The view:** target, detector, view mode, field size, frames loaded, first/last/current dates, coverage summary and warning, loading state, open panels, and the blink A/B dates (in blink or A/B residual mode). It does not see the image pixels.
+- **The app:** an app guide in the prompt (`APP_GUIDE` in `api/_assistant.js`) names the real controls, so "how do I…" questions get short numbered steps. Update it when controls change.
 
 ## Providers and fallback
 

@@ -8,7 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2315171b' stroke='%23e8e9eb' stroke-width='2'/%3E%3Ccircle cx='11' cy='13' r='2' fill='%23a0a4ad'/%3E%3Ccircle cx='20' cy='19' r='3' fill='%23f7f7f7'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/style.css?v=34">
 </head>
 <body>
   <div class="starfield" id="starfield" aria-hidden="true"></div>
@@ -273,13 +273,13 @@
 
       <div class="filmstrip" id="filmstrip"></div>
       <section class="assistant-panel" id="assistant">
-        <button type="button" class="assistant-fab" aria-expanded="false" aria-controls="assistantDrawer">Ask about this view</button>
+        <button type="button" class="assistant-fab" aria-expanded="false" aria-controls="assistantDrawer">Ask SpaceLapse</button>
         <aside class="assistant-drawer" id="assistantDrawer" role="dialog" aria-labelledby="assistantTitle" hidden>
-        <div class="assistant-head"><span class="section-kicker" id="assistantTitle">ASK ABOUT THIS VIEW</span><button type="button" class="assistant-close" aria-label="Close">×</button></div>
-        <p class="hint">Plain-language answers about what is on screen.</p>
+        <div class="assistant-head"><span class="section-kicker" id="assistantTitle">ASK SPACELAPSE</span><button type="button" class="assistant-close" aria-label="Close">×</button></div>
+        <p class="hint">Plain-language help with what you are seeing or how to use the app.</p>
         <form class="assistant-form">
           <label class="visually-hidden" for="assistantQuestion">Your question</label>
-          <textarea id="assistantQuestion" rows="2" maxlength="500" placeholder="e.g. What am I looking at? Why did this star move?"></textarea>
+          <textarea id="assistantQuestion" rows="2" maxlength="500" placeholder="e.g. What am I looking at? How do I compare two dates?"></textarea>
           <button type="submit" class="control-jump">Ask</button>
         </form>
         <p class="assistant-answer" role="status" aria-live="polite"></p>
@@ -407,7 +407,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="js/app.js?v=33"></script>
-  <script type="module" src="js/ui-effects.js?v=33"></script>
+  <script type="module" src="js/app.js?v=34"></script>
+  <script type="module" src="js/ui-effects.js?v=34"></script>
 </body>
 </html>

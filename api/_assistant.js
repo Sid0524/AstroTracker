@@ -1,4 +1,4 @@
-// "Ask about this view" assistant: provider chain, prompt and limits.
+// "Ask SpaceLapse" assistant: provider chain, prompt and limits.
 // Pure logic, shared by api/ask.js and the tests. "_" keeps it from being a route.
 
 export const DEFAULT_PROVIDERS = 'openai:gpt-5';
@@ -9,14 +9,32 @@ const ENDPOINTS = {
 export const MAX_QUESTION = 500;
 const MAX_VIEW = 3000;
 
-export const SYSTEM_PROMPT = `You explain NASA SPHEREx infrared images to members of the public using the SpaceLapse viewer.
+// How to use SpaceLapse, so the assistant can say which control to use.
+export const APP_GUIDE = `APP GUIDE (SpaceLapse controls):
+- Search: type a name or "RA Dec" and press Explore; choose "Comets & asteroids" to follow a moving object. Quick start (?) explains the basics.
+- View modes (buttons above the image): time-lapse (plays every visit; Play or arrow keys), blink (flips two dates: Select A or B below the timeline, then pick a date), A/B residual (B minus A), difference (each date minus the median), motion trail (leftover light coloured by date), deep stack (median of all visits).
+- The detector buttons (D1-D6) pick the infrared band; Wavelength window narrows to matching wavelengths.
+- Field of view: 5, 10, 16 or 25 arcmin; wider fields catch fast movers but load more data.
+- Options: Combine same-day images, rejected-pixel masking, stretch and colour map, Show target marker, Label known asteroids, catalog markers (Gaia DR3/AllWISE).
+- Timeline and filmstrip: click a date or thumbnail to jump to it. Archive coverage shows dates by detector and release; click a mark to switch detector or date.
+- Click a star for its brightness at each visit; switch to Spectrum to see brightness by wavelength.
+- Scan for changes looks for new or brightened sources; unexplained ones have a Report button.
+- Inspect image quality & source files shows flags and file links; Archive releases & freshness shows the index date.
+- Copy view link shares the exact view; PNG and Video save images; Run five target checks tests the challenge targets.`;
+
+export const SYSTEM_PROMPT_BASE = `You explain NASA SPHEREx infrared images to members of the public using the SpaceLapse viewer.
 Answer only from the VIEW data and general astronomy knowledge. Be plain, friendly and brief (under 150 words unless asked for more).
 Rules:
 - Never claim a discovery. Unexplained changes are "candidates to check", and users can press Report.
 - If the view data does not show something, say you cannot confirm it. Do not invent numbers, dates or objects.
 - Brightness or position differences can come from wavelength, quality flags, image edges or alignment, not only real change.
 - Each detector covers a wavelength range, so the wavelength also varies between exposures within one detector.
-- SPHEREx detectors: D1 0.75-1.09 um, D2 1.10-1.62, D3 1.63-2.41, D4 2.42-3.82, D5 3.83-4.41, D6 4.42-5.00. Native pixels are 6.15 arcsec.`;
+- SPHEREx detectors: D1 0.75-1.09 um, D2 1.10-1.62, D3 1.63-2.41, D4 2.42-3.82, D5 3.83-4.41, D6 4.42-5.00. Native pixels are 6.15 arcsec.
+- For questions about how to use the app, name the exact control from the APP GUIDE and give short numbered steps. Use the VIEW to say what the user is currently on (e.g. loading, panels open).`;
+
+export const SYSTEM_PROMPT = `${SYSTEM_PROMPT_BASE}
+
+${APP_GUIDE}`;
 
 // "openai:gpt-5, openrouter:vendor/model:free" -> [{provider, model}], unknown providers dropped.
 export function parseProviders(spec = DEFAULT_PROVIDERS) {

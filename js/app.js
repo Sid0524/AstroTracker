@@ -1887,6 +1887,9 @@ function assistantView() {
     detector: det ? `${det.name} (${det.range})` : null, viewMode: state.mode, fieldPixels: state.size,
     framesLoaded: ok.length, firstDate: day(ok[0]?.date), lastDate: day(ok.at(-1)?.date), currentDate: day(cur?.date),
     coverage: $('coverageSummary').textContent, coverageWarning: state.coverageNote || '',
+    loading: state.frames.some(f => f.status === 'pending'),
+    openPanels: [...document.querySelectorAll('#workspace details[open] > summary')].map(s => s.textContent.trim()),
+    ...(state.mode === 'blink' || state.mode === 'compare' ? { blinkA: day(state.blinkAFrame?.date), blinkB: day(state.blinkBFrame?.date) } : {}),
   };
 }
 

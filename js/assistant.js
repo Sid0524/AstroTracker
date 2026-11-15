@@ -1,4 +1,4 @@
-// "Ask about this view": a floating button opens a drawer that sends the question
+// "Ask SpaceLapse": a floating button opens a drawer that sends the question
 // and a summary of the view to /api/ask.
 
 export function initAssistant(root, { getView, fetchImpl = (...a) => fetch(...a), endpoint = 'api/ask' }) {

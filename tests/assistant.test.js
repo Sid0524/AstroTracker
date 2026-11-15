@@ -1,7 +1,7 @@
 // Assistant server: provider chain with fallback, limits, prompt rules. No network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ask, buildMessages, createLimiter, parseProviders, requestBody, validateRequest, SYSTEM_PROMPT } from '../api/_assistant.js';
+import { APP_GUIDE, ask, buildMessages, createLimiter, parseProviders, requestBody, validateRequest, SYSTEM_PROMPT } from '../api/_assistant.js';
 import { createHandler } from '../api/ask.js';
 
 const ENV = { OPENAI_API_KEY: 'sk-openai-test', OPENROUTER_API_KEY: 'sk-or-test' };
@@ -135,4 +135,15 @@ test('the API returns 503 without details when no provider can answer', async ()
     assert.equal(r.code, 503);
     assert.deepEqual(Object.keys(r.data), ['error']);
   } finally { console.warn = warn; }
+});
+
+test('UI/C: the prompt includes an app guide naming the real controls, so the assistant can say what to press', () => {
+  for (const control of ['Explore', 'time-lapse', 'blink', 'Select A or B below the timeline', 'detector buttons', 'Field of view',
+    'Combine same-day images', 'Wavelength window', 'Scan for changes', 'Report', 'Copy view link', 'Archive coverage',
+    'Inspect image quality', 'Label known asteroids', 'Spectrum', 'Run five target checks', 'Quick start']) {
+    assert.ok(APP_GUIDE.includes(control), control);
+  }
+  assert.ok(SYSTEM_PROMPT.includes(APP_GUIDE));
+  assert.match(SYSTEM_PROMPT, /how to use the app[\s\S]*name the exact control/i);
+  assert.ok(SYSTEM_PROMPT.length < 4000, 'prompt stays small and cacheable');
 });
