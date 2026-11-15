@@ -37,11 +37,7 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: SpaceLapse unit tests
-        continue-on-error: true
-        run: npm test
-
-      - name: Component tests + coverage (lines 90%, branches 80%)
+      - name: JS unit + component tests + coverage (lines 90%, branches 80%)
         continue-on-error: true
         run: |
           set -o pipefail
