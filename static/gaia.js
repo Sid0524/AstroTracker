@@ -9,10 +9,11 @@ const GaiaOverlay = (() => {
   const GAIA_TABLE = GAIA_CATALOG.replace(/\//g, "_"); // name used in VizieR "#Table" lines
   const GAIA_FIELDS = "Source,RA_ICRS,DE_ICRS,pmRA,pmDE";
   const GAIA_EPOCH = 2016.0; // DR3 reference epoch J2016.0
-  const MAX_SOURCES = 200;
+  const MAX_SOURCES = 50; // nearest sources kept; more reads as "capped"
   const QUERY_TIMEOUT_MS = 15000;
   const CACHE_SIZE = 8;
   const GRID = 128; // matches GRID_SIZE in app.py
+  const MARKER_RADIUS = 0.85; // ring radius in grid units (~1.2 arcsec at 3 arcmin)
   const SVG = "http://www.w3.org/2000/svg";
   const DEG = Math.PI / 180;
   const MAS_PER_DEG = 3600000;
@@ -89,7 +90,7 @@ const GaiaOverlay = (() => {
 
   const abortError = () => new DOMException("Gaia query cancelled.", "AbortError");
 
-  // One cone query. Resolves {sources (<= 200, nearest first), capped, queriedAt, field};
+  // One cone query. Resolves {sources (<= MAX_SOURCES, nearest first), capped, queriedAt, field};
   // rejects with "Query failed, Gaia not checked (...)" or an AbortError if cancelled.
   async function fetchGaia(field, { signal, fetch: fetchImpl = globalThis.fetch, timeoutMs = QUERY_TIMEOUT_MS, now = () => new Date() } = {}) {
     const checked = checkField(field);
@@ -278,7 +279,7 @@ const GaiaOverlay = (() => {
         const circle = doc.createElementNS(SVG, "circle");
         circle.setAttribute("cx", xy.x.toFixed(3));
         circle.setAttribute("cy", xy.y.toFixed(3));
-        circle.setAttribute("r", "2.5");
+        circle.setAttribute("r", String(MARKER_RADIUS));
         circle.setAttribute("class", p.projected ? "gaia-marker" : "gaia-marker no-pm");
         const title = doc.createElementNS(SVG, "title");
         title.textContent = `Gaia DR3 ${p.source.id}${p.projected ? "" : " (no proper motion; J2016.0 position)"}`;
@@ -307,7 +308,7 @@ const GaiaOverlay = (() => {
   }
 
   return {
-    VIZIER_ASU_URL, GAIA_CATALOG, MAX_SOURCES, QUERY_TIMEOUT_MS, GRID,
+    VIZIER_ASU_URL, GAIA_CATALOG, MAX_SOURCES, QUERY_TIMEOUT_MS, GRID, MARKER_RADIUS,
     parseVizierTSV, queryUrl, coneRadiusArcmin, fetchGaia, decimalYear, propagate, propagateSources, projectToGrid, createOverlay,
   };
 })();

@@ -57,6 +57,22 @@ canvas { height: 100%; width: auto; max-width: 100%; object-fit: contain; displa
 .orbit::after { content: ""; position: absolute; width: 6px; height: 6px; background: var(--accent); top: 4px; left: 14px; border-radius: 50%; box-shadow: 0 0 12px var(--accent); }
 .image-badge { position: absolute; bottom: 14px; left: 15px; font: 11px/1.7 ui-monospace, monospace; background: #0a1524d9; padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; }
 .scale { position: absolute; right: 18px; bottom: 20px; border-top: 2px solid var(--muted); padding-top: 3px; font-size: 10px; color: var(--muted); }
+/* Gaia overlay: fills the stage; the default preserveAspectRatio (xMidYMid meet) fits the
+   128-unit square exactly where the contained, centered canvas draws its 128x128 pixels. */
+.gaia-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.gaia-marker { fill: none; stroke: #ffc861; stroke-width: 1px; vector-effect: non-scaling-stroke; pointer-events: stroke; }
+.gaia-marker.no-pm { stroke-dasharray: 2 1.5; }
+.gaia-controls { padding: 0 22px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.gaia-controls .check { margin: 12px 0; }
+.gaia-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-bottom: 12px; }
+.gaia-status { color: var(--accent); }
+.gaia-status.error { color: #ffb7a5; }
+.gaia-panel button { padding: 5px 11px; }
+.gaia-legend { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 11px; }
+.gaia-swatch { display: inline-block; width: 10px; height: 10px; border: 1.5px solid #ffc861; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.gaia-swatch.no-pm { border-style: dashed; }
+.gaia-provenance { width: 100%; margin: 0; color: var(--muted); font-size: 11px; }
+.gaia-provenance:empty { display: none; }
 .status { color: var(--accent); font-size: 12px; padding: 13px 22px; border-bottom: 1px solid var(--line); }
 .status.error { color: #ffb7a5; }
 .warnings { padding: 12px 22px; font-size: 12px; background: #342b1b; color: #f2d09c; white-space: pre-line; }

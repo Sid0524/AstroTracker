@@ -9,6 +9,7 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const HTML = fs.readFileSync(path.join(ROOT, "static", "index.html"), "utf8")
   .replace(/<script[^>]*><\/script>/g, ""); // scripts are loaded by require() below
 const TIMELINE = path.join(ROOT, "static", "timeline.js");
+const GAIA = path.join(ROOT, "static", "gaia.js");
 const VIEWER = path.join(ROOT, "static", "viewer.js");
 const BANDS = ["SPHEREx-D1", "SPHEREx-D2", "SPHEREx-D3", "SPHEREx-D4", "SPHEREx-D5", "SPHEREx-D6"];
 const MJD_UNIX_EPOCH = 40587;
@@ -69,8 +70,10 @@ function loadApp({ url = "http://localhost:8000/", fetch } = {}) {
     FormData: w.FormData, Event: w.Event, fetch: fetch ?? (async () => { throw new Error("no backend"); }),
   });
   delete require.cache[TIMELINE];
+  delete require.cache[GAIA];
   delete require.cache[VIEWER];
   globalThis.ObservationTimeline = require(TIMELINE);
+  globalThis.GaiaOverlay = require(GAIA);
   const viewer = require(VIEWER);
   const $ = (id) => w.document.getElementById(id);
   return { dom, w, doc: w.document, viewer, $, timeline: globalThis.ObservationTimeline };

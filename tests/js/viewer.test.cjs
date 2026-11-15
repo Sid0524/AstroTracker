@@ -403,3 +403,75 @@ test("UI: UI text uses correct singular/plural wording for one exposure, date an
   await load(app);
   assert.match(app.$("status").textContent, /^1 aligned frame ready in /);
 });
+
+// ------------------------------------------------------------- P3 Gaia overlay
+
+const VIZIER = "https://vizier.cfa.harvard.edu/viz-bin/asu-tsv";
+// One Gaia source at the Barnard field center, with zero proper motion so it stays in view.
+const GAIA_ROWS = "#Table\tI_355_gaiadr3:\n_r\tSource\tRA_ICRS\tDE_ICRS\tpmRA\tpmDE\n0.00\t111\t269.446268\t4.768204\t0\t0\n";
+
+// Routes VizieR URLs to a fake catalog and everything else to the fake /api backend.
+function withVizier(fake, body = GAIA_ROWS) {
+  const vizier = [];
+  const fetch = async (url, init) => {
+    if (url.startsWith(VIZIER)) { vizier.push(url); return { ok: true, status: 200, text: async () => body }; }
+    return fake.fetch(url, init);
+  };
+  return { fetch, calls: fake.calls, vizier };
+}
+
+test("P3: no request on page load, even when a shared link restores gaia=1", async () => {
+  const requests = [];
+  const app = loadApp({
+    url: "http://localhost:8000/?ra=269.446268&dec=4.768204&fov=3&release=both&deep=0&gaia=1",
+    fetch: async (url) => { requests.push(url); throw new Error("no request expected on page load"); },
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(requests, [], "neither /api nor VizieR is contacted");
+  assert.equal(app.$("gaia-toggle").checked, true, "the toggle is restored");
+  assert.equal(app.$("gaia-panel").hidden, false);
+  assert.equal(app.$("gaia-status").textContent, "Gaia not queried yet. Search a field first.");
+  assert.equal(app.$("gaia-action").hidden, false);
+  assert.equal(app.$("gaia-action").textContent, "Query Gaia");
+  assert.equal(app.$("gaia-overlay").querySelectorAll("circle").length, 0);
+  assert.equal(app.$("fov").value, "3", "the other shared parameters still prefill the form");
+  assert.equal(app.$("release").value, "both");
+
+  const plain = loadApp({ url: "http://localhost:8000/?ra=1&dec=2", fetch: async (url) => { requests.push(url); } });
+  assert.equal(plain.$("gaia-toggle").checked, false, "the overlay is off by default");
+  assert.equal(plain.$("gaia-panel").hidden, true);
+  assert.deepEqual(requests, []);
+});
+
+test("P3: a search with gaia=1 waits for Query Gaia, shares gaia=1, and a new search does not re-query", async () => {
+  let center = {};
+  const fake = withVizier(fakeFetch({
+    search: () => [200, searchBody(barnardRecords(), undefined, center)],
+    frame: (id) => [200, frameBody(id)],
+  }));
+  const app = loadApp({ url: "http://localhost:8000/?gaia=1", fetch: fake.fetch });
+  await search(app);
+  assert.equal(fake.vizier.length, 0, "the search itself does not query Gaia");
+  assert.equal(app.$("gaia-status").textContent, "Gaia not queried yet.");
+  assert.equal(new URL(app.w.location.href).searchParams.get("gaia"), "1");
+  assert.equal(new URLSearchParams(fake.calls[0].split("?")[1]).has("gaia"), false, "gaia is not sent to /api/search");
+
+  click(app.w, app.$("gaia-action"));
+  await until(() => /^1 Gaia DR3 source in the query cone\.$/.test(app.$("gaia-status").textContent), "Gaia result");
+  assert.equal(fake.vizier.length, 1);
+  await load(app);
+  assert.equal(app.$("gaia-overlay").querySelectorAll("circle").length, 1, "a marker is drawn once a frame is displayed");
+  assert.match(app.$("gaia-provenance").textContent,
+    /^Gaia DR3 \(I\/355\/gaiadr3\), queried via VizieR ASU on \d{4}-\d{2}-\d{2} UTC, linear proper-motion propagation to \d{4}-\d{2}-\d{2} \(\d{4}\.\d{3}\)\.$/);
+
+  center = { ra: 270, dec: 5 }; // a different field
+  await search(app);
+  assert.equal(fake.vizier.length, 1, "a new search does not query again by itself");
+  assert.equal(app.$("gaia-status").textContent, "Gaia not queried yet.");
+  assert.equal(app.$("gaia-overlay").querySelectorAll("circle").length, 0);
+
+  center = {}; // back to the first field: shown from cache, still no request
+  await search(app);
+  assert.equal(fake.vizier.length, 1);
+  assert.match(app.$("gaia-status").textContent, /^1 Gaia DR3 source in the query cone\./);
+});

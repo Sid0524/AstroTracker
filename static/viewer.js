@@ -6,6 +6,8 @@ const LOAD_CONCURRENCY = 4; // cutouts fetched in parallel
 // WISE 0855 moves ~8"/yr; the default uses its 2026 position (docs/VERIFICATION.md).
 const samples = { barnard: [269.446268, 4.768204], wise: [133.75947, -7.242557], wiseref: [133.7951292, -7.2451472] };
 const state = { search: null, selected: new Set(), frames: [], current: 0, a: 0, b: 1, timer: null, busy: false, generation: 0 };
+// Optional Gaia DR3 overlay (static/gaia.js). It queries only when the user asks.
+const gaia = GaiaOverlay.createOverlay({ toggle: $("gaia-toggle"), panel: $("gaia-panel"), status: $("gaia-status"), action: $("gaia-action"), provenance: $("gaia-provenance"), svg: $("gaia-overlay") });
 const bandLabels = { "SPHEREx-D1": "D1 / 0.75-1.09 um", "SPHEREx-D2": "D2 / 1.10-1.62 um", "SPHEREx-D3": "D3 / 1.63-2.41 um", "SPHEREx-D4": "D4 / 2.42-3.82 um", "SPHEREx-D5": "D5 / 3.83-4.41 um", "SPHEREx-D6": "D6 / 4.42-5.00 um" };
 
 function plural(n, word) { return `${n} ${word}${n === 1 ? "" : "s"}`; }
@@ -92,6 +94,7 @@ function clearFrames() {
   $("frame-details").textContent = "No frames loaded for this selection.";
   $("timeline-labels").firstElementChild.textContent = "No frames loaded";
   $("timeline-labels").lastElementChild.textContent = "";
+  gaia.setFrameDate(null);
 }
 
 function pickEndpoints() {
@@ -235,6 +238,7 @@ function draw() {
   $("empty-state").hidden = true;
   $("image-badge").hidden = false;
   const r = frame.record;
+  gaia.setFrameDate(r.date);
   $("image-badge").textContent = `${r.date.replace("T", " ")} | ${r.release} | ${r.band.replace("SPHEREx-", "")}`;
   $("scale").hidden = false;
   $("scale").textContent = `${state.search.fov_arcmin} arcmin full width`;
@@ -307,6 +311,7 @@ async function searchField(event) {
   clearFrames();
   state.search = null;
   state.selected.clear();
+  gaia.setField(null);
   renderTable();
   $("warnings").hidden = true;
   setBusy(true);
@@ -320,9 +325,11 @@ async function searchField(event) {
     const bands = [...new Set(state.search.records.map((r) => r.band))].sort();
     $("band").replaceChildren(...bands.map((band) => new Option(bandLabels[band], band)));
     $("field-label").textContent = `${state.search.ra.toFixed(4)}, ${state.search.dec.toFixed(4)} / ICRS`;
+    gaia.setField({ ra: state.search.ra, dec: state.search.dec, fovArcmin: state.search.fov_arcmin });
     setBusy(false);
     pickEndpoints();
     const share = new URL(window.location.href);
+    if (gaia.isEnabled()) params.set("gaia", "1");
     share.search = params.toString();
     history.replaceState(null, "", share);
     const incomplete = (state.search.collection_status || []).filter((s) => s.status !== "ok" && s.status !== "empty").map((s) => s.collection);
@@ -359,6 +366,7 @@ const initial = new URLSearchParams(window.location.search);
 for (const id of ["ra", "dec", "fov", "release"]) if (initial.has(id)) $(id).value = initial.get(id);
 $("deep").checked = initial.get("deep") === "1";
 if (initial.has("ra") || initial.has("dec")) $("sample").value = "custom";
+if (initial.get("gaia") === "1") gaia.restore(true); // toggle only; never queries
 
 // For Node tests; no-op in the browser.
 if (typeof module === "object" && module.exports) {

@@ -82,18 +82,20 @@ test("P3: the cone is the field's circumscribed circle, nearest-first, with one 
   assert.equal(url.searchParams.get("-source"), Gaia.GAIA_CATALOG);
   assert.equal(url.searchParams.get("-c"), "10 20");
   assert.equal(Number(url.searchParams.get("-c.rm")), 3 / Math.SQRT2);
-  assert.equal(url.searchParams.get("-out.max"), "201");
+  assert.equal(url.searchParams.get("-out.max"), "51");
   assert.equal(url.searchParams.get("-sort"), "_r");
   assert.equal(Number(new URL(Gaia.queryUrl({ ...FIELD, fovArcmin: 12 })).searchParams.get("-c.rm")), 12 / Math.SQRT2);
   assert.throws(() => Gaia.queryUrl({ ...FIELD, ra: 360 }), /ra must be/);
 });
 
-test("P3: 201 rows are capped to the nearest 200 and flagged; 200 rows are not", async () => {
-  const capped = await Gaia.fetchGaia(FIELD, { fetch: vizier(() => table(manyRows(201))).fetch });
-  assert.equal(capped.sources.length, 200);
+test("P3: 51 rows are capped to the nearest 50 and flagged; 50 rows are not", async () => {
+  assert.equal(Gaia.MAX_SOURCES, 50);
+  const capped = await Gaia.fetchGaia(FIELD, { fetch: vizier(() => table(manyRows(51))).fetch });
+  assert.equal(capped.sources.length, 50);
+  assert.deepEqual([capped.sources[0].id, capped.sources[49].id], ["1", "50"], "the nearest-first order is kept");
   assert.equal(capped.capped, true);
-  const full = await Gaia.fetchGaia(FIELD, { fetch: vizier(() => table(manyRows(200))).fetch });
-  assert.equal(full.sources.length, 200);
+  const full = await Gaia.fetchGaia(FIELD, { fetch: vizier(() => table(manyRows(50))).fetch });
+  assert.equal(full.sources.length, 50);
   assert.equal(full.capped, false);
   assert.match(full.queriedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
@@ -196,12 +198,12 @@ test("P3: a failure reads as not checked with Retry; an empty retry reads as 0 s
   assert.equal(f.calls.length, 2);
 });
 
-test("P3: more than 200 rows reads as capped at 200", async () => {
-  const f = fixture(() => table(manyRows(201)));
+test("P3: more than 50 rows reads as capped at 50", async () => {
+  const f = fixture(() => table(manyRows(51)));
   f.overlay.setField(FIELD);
   f.turnOn();
   await until(() => f.overlay.snapshot().phase === "ready", "ready");
-  assert.match(f.els.status.textContent, /^Capped at 200: showing the 200 Gaia DR3 sources nearest the center/);
+  assert.match(f.els.status.textContent, /^Capped at 50: showing the 50 Gaia DR3 sources nearest the center; more exist in this field\./);
 });
 
 test("P3: frame changes re-propagate markers without re-querying; provenance names the epoch", async () => {
@@ -221,6 +223,7 @@ test("P3: frame changes re-propagate markers without re-querying; provenance nam
   assert.equal(f.calls.length, 1, "frames only re-propagate");
   assert.equal(f.markers().length, 2);
   assert.equal(f.markers()[1].getAttribute("class"), "gaia-marker no-pm");
+  for (const ring of f.markers()) assert.equal(ring.getAttribute("r"), "0.85", "small rings, about a third of the old 2.5");
   assert.match(f.els.status.textContent, /2 Gaia DR3 sources in the query cone\. 2 inside the image\. 1 without proper motion/);
   assert.match(f.els.provenance.textContent,
     /^Gaia DR3 \(I\/355\/gaiadr3\), queried via VizieR ASU on \d{4}-\d{2}-\d{2} UTC, linear proper-motion propagation to 2026-01-01 \(2026\.000\)\.$/);
