@@ -29,7 +29,7 @@ import time
 import urllib.parse
 import urllib.request
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 TAP = 'https://irsa.ipac.caltech.edu/TAP/sync'
 # Quick Releases and the reprocessed Data Release use the same level-2
@@ -150,6 +150,35 @@ def fetch_folder(collection, folder):
     return rows
 
 
+def fetch_all(todo, name, workers=4, max_minutes=0, fetch=None, clock=None):
+    """Fetch folders in parallel, keeping finished work if others fail or time runs out.
+
+    Stops starting new folders once max_minutes (0 = no limit) has elapsed.
+    Returns (fetched {name: rows}, failed [names], skipped [names]); failed and
+    skipped folders stay incomplete so the next run retries them.
+    """
+    fetch, clock = fetch or fetch_folder, clock or time.monotonic
+    start, queue = clock(), list(todo)
+    fetched, failed, running = {}, [], {}
+    with ThreadPoolExecutor(workers) as pool:
+        while queue or running:
+            while queue and len(running) < workers and not (max_minutes and clock() - start >= max_minutes * 60):
+                w = queue.pop(0)
+                running[pool.submit(fetch, *w)] = w
+            if not running:
+                break  # time budget used up
+            done, _ = wait(running, return_when=FIRST_COMPLETED)
+            for fut in done:
+                w = running.pop(fut)
+                try:
+                    fetched[name(w)] = fut.result()
+                    print(f'  [{len(fetched) + len(failed)}/{len(todo)}] {name(w)}: {len(fetched[name(w)])} images', flush=True)
+                except Exception as e:  # noqa: BLE001
+                    failed.append(name(w))
+                    print(f'  {name(w)} failed, will retry next run: {e}', file=sys.stderr, flush=True)
+    return fetched, failed, [name(w) for w in queue]
+
+
 def load_existing():
     path = os.path.join(ROOT, 'index.json')
     if not os.path.exists(path):
@@ -169,6 +198,7 @@ def main():
     ap.add_argument('--recent', type=int, default=4, help='always re-fetch this many newest folders per collection')
     ap.add_argument('--workers', type=int, default=4)
     ap.add_argument('--limit', type=int, default=0, help='only fetch this many new folders (testing)')
+    ap.add_argument('--max-minutes', type=float, default=0, help='stop starting folders after this long; 0 = no limit')
     args = ap.parse_args()
 
     started_at = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -188,7 +218,7 @@ def main():
     wanted = sorted({(r['obs_collection'], r['folder']) for r in listing}, key=lambda x: (x[1], x[0]))
     recent = set()
     for c in collections:
-        recent |= set([w for w in wanted if w[0] == c][-args.recent:])
+        recent |= set([w for w in wanted if w[0] == c][-args.recent:] if args.recent > 0 else [])  # [-0:] would be all
     refresh_all = 'all' in args.refresh
 
     def name(w):
@@ -199,12 +229,9 @@ def main():
         todo = todo[: args.limit]
     print(f'{len(wanted)} folders, fetching {len(todo)}')
 
-    fetched = {}
-    with ThreadPoolExecutor(args.workers) as pool:
-        futures = {pool.submit(fetch_folder, *w): w for w in todo}
-        for i, (fut, w) in enumerate(futures.items()):
-            fetched[name(w)] = fut.result()
-            print(f'  [{i + 1}/{len(todo)}] {name(w)}: {len(fetched[name(w)])} images', flush=True)
+    fetched, failed, skipped = fetch_all(todo, name, args.workers, args.max_minutes)
+    if failed or skipped:
+        print(f'{len(failed)} failed and {len(skipped)} deferred folders stay incomplete for the next run')
 
     # Drop re-fetched folders from existing tiles, then add new rows.
     tiles = defaultdict(list)
@@ -252,6 +279,8 @@ def main():
             'mode': refresh_mode,
             'collectionsDiscovered': collections,
             'foldersRefreshed': sorted(fetched),
+            'foldersFailed': sorted(failed),
+            'foldersDeferred': sorted(skipped),
         },
         'tileDeg': TILE_DEG,
         'mjd0': MJD0,

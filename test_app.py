@@ -62,7 +62,7 @@ class ViewerTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertEqual(self.client.get("/api/search?" + query).status_code, 400)
 
-    @patch("app.query_collection", return_value=([], False))
+    @patch("app.query_collection", return_value=([], False, 0))
     def test_no_coverage_is_successful_empty_search(self, query):
         response = self.client.get("/api/search?ra=0&dec=90&fov=1")
         self.assertEqual(response.status_code, 200)
@@ -75,7 +75,7 @@ class ViewerTests(unittest.TestCase):
         def result(collection, *args):
             if collection.endswith("qr3"):
                 raise app.ViewerError("Test outage")
-            return [record()], False
+            return [record()], False, 0
         query.side_effect = result
         response = self.client.get("/api/search?ra=269&dec=4&fov=3")
         self.assertEqual(response.status_code, 200)
@@ -86,7 +86,7 @@ class ViewerTests(unittest.TestCase):
     def test_total_archive_failure_is_not_no_coverage(self, query):
         self.assertEqual(self.client.get("/api/search?ra=269&dec=4&fov=3").status_code, 502)
 
-    @patch("app.query_collection", return_value=([record()], True))
+    @patch("app.query_collection", return_value=([record()], True, 0))
     def test_truncation_is_reported_and_release_scope_is_preserved(self, query):
         response = self.client.get("/api/search?ra=269&dec=4&fov=3&release=dr1&deep=1")
         self.assertEqual(response.json["collections"], ["spherex_dr1", "spherex_dr1_deep"])
@@ -99,7 +99,7 @@ class ViewerTests(unittest.TestCase):
         })
         output = io.BytesIO()
         writeto(from_table(table), output)
-        rows, truncated = app.parse_records(output.getvalue(), "spherex_dr1")
+        rows, truncated, skipped = app.parse_records(output.getvalue(), "spherex_dr1")
         self.assertFalse(truncated)
         self.assertEqual(rows[0]["date"][:10], "2025-08-27")
         self.assertAlmostEqual(rows[0]["range_um"][0], 0.75)
@@ -181,8 +181,8 @@ class ViewerTests(unittest.TestCase):
         fetch.side_effect = HTTPError("https://irsa.ipac.caltech.edu/SIA", 503, "Busy", {}, None)
         with self.assertLogs(app.app.logger, level="WARNING"), self.assertRaises(app.ViewerError):
             app.archive_get("https://irsa.ipac.caltech.edu/SIA", 100)
-        self.assertEqual(fetch.call_count, 2)
-        sleep.assert_called_once_with(1)
+        self.assertEqual(fetch.call_count, 1 + len(app.RETRY_DELAYS))
+        self.assertEqual([c.args[0] for c in sleep.call_args_list], list(app.RETRY_DELAYS))
 
     @patch("app.archive_get", return_value=synthetic_cutout())
     def test_frame_cache_and_expired_search(self, fetch):

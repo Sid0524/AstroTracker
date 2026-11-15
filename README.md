@@ -33,6 +33,8 @@ No install, no account, no backend. Everything runs in the browser.
   (near-Earth objects) across the exposures of a single visit.
   Anything left unexplained has a **Report** button that opens a prefilled GitHub
   issue (labelled `candidate`) with its position, date, images and a link to the view.
+- **Archive coverage:** dates by detector and release, with the releases searched and
+  index date. Failed index tiles show as incomplete coverage, not as "no images".
 - **Known asteroids** labelled on each frame, from IMCCE's SkyBoT service.
 - **Light curves and spectra:** click any star to plot its brightness at every visit,
   or switch to *Spectrum* to measure it in every exposure across all six bands and
@@ -234,6 +236,24 @@ The CLI target check does not inspect cutouts or FLAGS. Use the browser's
 five-target checks for bounded cutout/metadata validation, and still inspect the
 objects manually. Shared metadata downloads are timeout-bounded; cancelling a
 target check does not cancel another view's in-flight cached request.
+
+## Flask viewer (data quality)
+
+`app.py` and `static/` are a separate local viewer that queries IRSA live and
+reads pixels from IRSA's public S3 copy. It shows per-release status (a failed
+release reads as "coverage unknown", not "no coverage") and an observation
+timeline of dates by detector.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe app.py   # http://127.0.0.1:8000
+```
+
+- Data sources and limits: [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md)
+- DR1/QR3 checks and benchmarks: [docs/VERIFICATION.md](docs/VERIFICATION.md)
+- Tests (`python -m unittest`, `npm run test:viewer`): [docs/TESTING.md](docs/TESTING.md)
+- Rebuilding the SpaceLapse index (e.g. for DR1): [docs/INDEX_REBUILD.md](docs/INDEX_REBUILD.md)
 
 ## Data credit
 

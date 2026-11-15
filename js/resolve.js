@@ -12,13 +12,19 @@ function sexa(str, hours) {
 }
 
 export function parseCoords(input) {
+  const raw = rawCoords(input);
+  return raw && check(raw[0], raw[1]);
+}
+
+// Coordinate-shaped input as [ra, dec] degrees, before the range check; else null.
+function rawCoords(input) {
   const s = input.trim().replace(/,/g, ' ');
   // Two plain decimal numbers
   let m = s.match(/^([+-]?\d+(?:\.\d+)?)\s+([+-]?\d+(?:\.\d+)?)$/);
-  if (m) return check(Number(m[1]), Number(m[2]));
+  if (m) return [Number(m[1]), Number(m[2])];
   // Sexagesimal: split where the declination sign starts, or into halves
   m = s.match(/^(\d{1,2}[\s:h]+\d{1,2}[\s:m]+\d{1,2}(?:\.\d+)?s?)\s+([+-]?\d{1,2}[\s:d°]+\d{1,2}[\s:m'′]+\d{1,2}(?:\.\d+)?["″s]?)$/);
-  if (m) return check(sexa(m[1], true), sexa(m[2], false));
+  if (m) return [sexa(m[1], true), sexa(m[2], false)];
   return null;
 }
 
@@ -30,7 +36,16 @@ function check(ra, dec) {
 export async function resolve(input, signal) {
   const c = parseCoords(input);
   if (c) return { ra: c[0], dec: c[1], name: null };
-  const res = await fetch(SESAME + encodeURIComponent(input.trim()), { signal });
+  if (rawCoords(input)) throw new Error('Coordinates out of range: RA must be 0 to 360 degrees (00h to 24h) and Dec -90 to +90 degrees.');
+  const unreachable = `The name "${input.trim()}" could not be checked: the name service (CDS Sesame) is unavailable. Try again, or enter RA Dec in degrees.`;
+  let res;
+  try {
+    res = await fetch(SESAME + encodeURIComponent(input.trim()), { signal });
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    throw new Error(unreachable);
+  }
+  if (!res.ok) throw new Error(unreachable);
   const doc = new DOMParser().parseFromString(await res.text(), 'application/xml');
   const ra = doc.querySelector('jradeg'), dec = doc.querySelector('jdedeg');
   if (!ra || !dec) throw new Error(`Couldn't find "${input}". Try another name or enter RA Dec in degrees.`);

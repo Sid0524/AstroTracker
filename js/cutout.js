@@ -4,6 +4,7 @@ import { readImageHeader, readRows, readFlagsInfo, readFlagRows, BAD_FLAGS, ANAL
 import { WCS, tanDeproject, D2R } from './wcs.js';
 import { countFlagBits } from './observations.js';
 import { cachedRequest } from './request-cache.js';
+import { createCutoutCache, cutoutKey } from './cutout-cache.js';
 
 export const PIXEL_ARCSEC = 6.15;
 const STEP = 8; // coarse-grid spacing for the exact WCS mapping
@@ -43,7 +44,15 @@ function cachedGrid(ra, dec, size, scale) {
 }
 
 // Returns { data: Float32Array(size*size), valid } or { offImage: true }.
-export async function makeCutout(exposure, ra, dec, size, signal, { mask = true, scale = PIXEL_ARCSEC } = {}) {
+const cutouts = createCutoutCache();
+
+// Cached: revisiting a detector or date reuses finished cutouts (see cutout-cache.js).
+export function makeCutout(exposure, ra, dec, size, signal, { mask = true, scale = PIXEL_ARCSEC } = {}) {
+  return cutouts.get(cutoutKey(exposure, ra, dec, size, mask, scale),
+    shared => buildCutout(exposure, ra, dec, size, shared, { mask, scale }), signal);
+}
+
+async function buildCutout(exposure, ra, dec, size, signal, { mask = true, scale = PIXEL_ARCSEC } = {}) {
   const info = await getHeader(exposure.url, signal);
   const { wcs, width, height } = info;
   const c = wcs.skyToPix(ra, dec);

@@ -1,5 +1,6 @@
 import { resolve, formatRA, formatDec } from './resolve.js';
-import { findExposures, findAlongPath, DETECTORS, loadIndex, summarizeIndex } from './catalog.js';
+import { findExposuresDetailed, findAlongPathDetailed, DETECTORS, loadIndex, summarizeIndex } from './catalog.js';
+import { renderCoverage, coverageSummary, noCoverageMessage, partialCoverageMessage, nearestIndex, noCutoutsMessage, partialDownloadMessage } from './coverage.js';
 import { ephemeris, positionAt } from './ephem.js';
 import { makeCutout, PIXEL_ARCSEC } from './cutout.js';
 import { tanDeproject, tanProject, D2R } from './wcs.js';
@@ -211,11 +212,15 @@ async function lookAt(query, opts = {}) {
     document.title = `${target.name || 'Sky position'} · SPHEREx Time-Lapse`;
     setLoading('Searching the SPHEREx archive…');
 
-    state.exposures = await findExposures(target.ra, target.dec, abort.signal);
+    const found = await findExposuresDetailed(target.ra, target.dec, abort.signal);
     if (abort.signal.aborted) return;
+    archiveIndex ??= await loadIndex();
+    state.exposures = found.exposures;
+    state.coverageNote = found.failedTiles.length ? partialCoverageMessage(found.failedTiles.length, found.tiles) : '';
+    if (state.coverageNote) toast(state.coverageNote);
     if (!state.exposures.length) {
       setLoading('');
-      toast('SPHEREx hasn’t released images of this spot yet. Try another target.');
+      if (!state.coverageNote) toast(noCoverageMessage(indexSummary()));
       renderBands();
       return;
     }
@@ -238,10 +243,12 @@ async function trackObject(name, opts, abort) {
     if (abort.signal.aborted) return;
     setLoading(`Searching SPHEREx images along the path of ${eph.name}…`);
     const at = mjd => positionAt(eph.points, mjd);
-    const exps = await findAlongPath(eph.points, at, abort.signal, (d, n) => {
+    const found = await findAlongPathDetailed(eph.points, at, abort.signal, (d, n) => {
       $('loadingText').textContent = `Searching SPHEREx images along the path of ${eph.name}… ${Math.round((100 * d) / n)}%`;
     });
     if (abort.signal.aborted) return;
+    archiveIndex ??= await loadIndex();
+    const exps = found.exposures;
     state.track = { ...eph, query: name };
     renderModes();
     $('trackNote').hidden = false;
@@ -250,13 +257,15 @@ async function trackObject(name, opts, abort) {
       : 'Positions from IMCCE Miriade. Comet predictions can be off by a minute of arc or two; if the object isn’t at the centre, try a wider field of view.';
     if (!eph.precise && !opts.size && eph.kind === 'comet') { state.size = 160; renderSizes(); }
     state.exposures = exps;
+    state.coverageNote = found.failedTiles.length ? partialCoverageMessage(found.failedTiles.length, found.tiles) : '';
+    if (state.coverageNote) toast(state.coverageNote);
     $('changes').hidden = true;
     $('targetName').textContent = eph.name;
     $('targetCoords').textContent = `Moving ${eph.kind || 'object'}`;
     document.title = `${eph.name} · SPHEREx Time-Lapse`;
     if (!exps.length) {
       setLoading('');
-      toast(`SPHEREx hasn’t released any images of ${eph.name} yet.`);
+      if (!state.coverageNote) toast(noCoverageMessage(indexSummary(), `${eph.name} along its path`));
       state.target = null;
       renderBands();
       return;
@@ -429,10 +438,12 @@ async function loadBand() {
   renderWaveStatus();
   renderTargetGuide();
   if (!n) {
-    toast(allLoaded().length ? 'No visits match the wavelength window. Widen it or choose All wavelengths.' : 'No usable cutouts loaded. Check the inspector, try a wider field or another detector.');
+    toast(allLoaded().length ? 'No visits match the wavelength window. Widen it or choose All wavelengths.' : noCutoutsMessage(state.frames));
     if (!list.length) $('qualityNote').textContent = 'No indexed exposures in the requested detector. Choose a different detector; the saved detector was not substituted.';
     return;
   }
+  const downloadNote = partialDownloadMessage(state.frames);
+  if (downloadNote) toast(downloadNote);
   if (state.restoreFailed || state.restoredEpoch) return;
   if (state.mode === 'play' && n > 1) play();
 }
@@ -871,7 +882,7 @@ function compass(vx, vy) {
 
 // ---------- reporting ----------
 
-const ISSUES = 'https://github.com/ShivenKhurana1/spherex-timelapse/issues/new';
+const ISSUES = 'https://github.com/Sid0524/AstroTracker/issues/new';
 
 function pixSky(x, y) {
   const n = state.size, s = (PIXEL_ARCSEC / 3600) * D2R, half = (n - 1) / 2;
@@ -1733,7 +1744,7 @@ for (const guide of CHALLENGE_GUIDES) {
 let checksAbort = null;
 function appendCheckReport(report) {
   const li = document.createElement('li');
-  li.textContent = `${report.target}: ${report.outcome}. ${report.error || report.comparisonUnavailable || ''}`;
+  li.textContent = `${report.target}: ${report.outcome}. ${report.error || report.comparisonUnavailable || ''} ${report.coverageWarning || ''}`.trim();
   $('checkResults').appendChild(li);
 }
 try {
@@ -1766,7 +1777,7 @@ $('runChecks').addEventListener('click', async () => {
     if (signal.aborted) break;
     $('checksStatus').textContent = `Checking ${guide.name} (${validationResults.length + 1} of 5)...`;
     let report;
-    try { report = await validateTarget(guide, findExposures, AbortSignal.any([signal, AbortSignal.timeout(90000)])); }
+    try { report = await validateTarget(guide, findExposuresDetailed, AbortSignal.any([signal, AbortSignal.timeout(90000)])); }
     catch (error) {
       if (signal.aborted) break;
       report = { target: guide.name, checkedAt: new Date().toISOString(), outcome: 'Failed', error: error.message };
@@ -1847,6 +1858,34 @@ function renderBands() {
   $('bandInfo').querySelector('.band-count').textContent = counts[state.band]
     ? `${counts[state.band]} archive images`
     : 'No archive images in this band';
+  renderCoverageChart();
+}
+
+// Release scope of the loaded index, or null before it has loaded.
+function indexSummary() {
+  return archiveIndex ? summarizeIndex(archiveIndex) : null;
+}
+
+function renderCoverageChart() {
+  const section = $('coverageSection');
+  section.hidden = !state.target && !state.coverageNote;
+  renderCoverage($('coverageChart'), { exposures: state.exposures, band: state.band, detectors: DETECTORS, onPick: pickCoverage });
+  $('coverageSummary').textContent = state.exposures.length
+    ? coverageSummary(state.exposures, indexSummary())
+    : state.coverageNote || noCoverageMessage(indexSummary());
+  $('coverageWarning').hidden = !state.coverageNote;
+  $('coverageWarning').textContent = state.coverageNote || '';
+}
+
+// Coverage chart click: switch detector, or jump to the nearest loaded date.
+function pickCoverage(detector, mjd) {
+  if (detector !== state.band) { state.band = detector; renderBands(); loadBand(); return; }
+  const best = nearestIndex(loaded(), mjd);
+  if (best < 0) return;
+  stop();
+  if (state.mode === 'motion' || state.mode === 'static') setMode('play');
+  state.idx = best;
+  draw();
 }
 
 function renderSizes() {
@@ -2084,6 +2123,7 @@ fromHash();
 
 loadIndex().then(ix => {
   archiveIndex = ix;
+  if (state.target) renderCoverageChart();
   const summary = summarizeIndex(ix), freshness = summary.freshness;
   const updated = freshness.status === 'known' ? `${freshness.updatedAt} (${Math.floor(freshness.ageMs / 86400000)} days ago)` : 'unknown';
   $('stats').textContent = `${ix.total.toLocaleString()} indexed detector-image records · updated ${updated}`;

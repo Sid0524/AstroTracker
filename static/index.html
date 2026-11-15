@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#09111e">
   <title>SPHEREx | Sky in motion</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/timeline.js" defer></script>
   <script src="/static/viewer.js" defer></script>
 </head>
 <body>
@@ -26,10 +27,11 @@
         <label for="sample">Sample target</label>
         <select id="sample">
           <option value="barnard">Barnard's Star</option>
-          <option value="wise">WISE 0855</option>
+          <option value="wise">WISE 0855 (2026 position)</option>
+          <option value="wiseref">WISE 0855 (challenge reference position)</option>
           <option value="custom">Custom coordinates</option>
         </select>
-        <p class="hint">Barnard's Star uses an approximate J2026 center; WISE 0855 uses a reference position. The field center stays fixed across dates.</p>
+        <p class="hint">Barnard's Star and WISE 0855 use approximate 2026 centers propagated with catalog proper motions. WISE 0855's challenge reference position is ~2 arcmin away from the object in 2025-26, outside a 3 arcmin view. The field center stays fixed across dates.</p>
         <form id="search-form">
           <div class="coordinate-row">
             <div><label for="ra">RA <small>degrees</small></label><input id="ra" name="ra" type="number" min="0" max="359.999999999" step="any" value="269.446268" required></div>
@@ -55,7 +57,7 @@
           <button id="suggest" type="button" disabled>Pick first + last date</button>
           <button id="load" class="primary" type="button" disabled>Load selected (0)</button>
         </div>
-        <p class="hint">At most 8 selected cutouts. A search retrieves metadata only.</p>
+        <p class="hint">At most 32 selected cutouts, fetched 4 at a time. A search retrieves metadata only.</p>
       </aside>
       <section class="panel viewer-panel" aria-label="Image viewer">
         <div class="viewer-top"><span class="eyebrow">03 / INSPECT THE SKY</span><span id="field-label" class="tiny">NORTH UP / EAST LEFT</span></div>
@@ -87,9 +89,23 @@
         <div id="frame-details" class="frame-details">Observation dates, wavelengths, release, and coverage will appear here.</div>
       </section>
     </div>
+    <section id="coverage" class="panel coverage" aria-labelledby="coverage-title">
+      <div class="section-title"><div><span class="eyebrow">OBSERVATION TIMELINE</span><h2 id="coverage-title">When each detector saw this field</h2></div></div>
+      <ul class="collection-status" aria-label="Searched collections"></ul>
+      <div class="obs-chart"><p class="table-empty">Search a field to see which dates and detectors have data.</p></div>
+      <p class="obs-summary hint" aria-live="polite"></p>
+      <ul class="obs-legend" aria-label="Legend">
+        <li><span class="swatch dr1"></span>DR1</li>
+        <li><span class="swatch qr3"></span>QR3</li>
+        <li><span class="swatch dr1 deep"></span>Deep survey (outline)</li>
+        <li><span class="swatch selected"></span>Selected</li>
+        <li><span class="swatch loaded"></span>Loaded</li>
+        <li><span class="swatch window"></span>Survey window (dates &lt; 30 days apart)</li>
+      </ul>
+    </section>
     <section class="panel observations">
       <div class="section-title"><div><span class="eyebrow">OBSERVATION LOG</span><h2>Exposures, not independent visits</h2></div><span id="record-count" class="tiny">0 RECORDS</span></div>
-      <p class="hint">Rows are overlapping exposures. Select up to 8 in one detector band. Loaded frames can be pinned as A or B.</p>
+      <p class="hint">Rows are overlapping exposures. Select up to 32 in one detector band. Loaded frames can be pinned as A or B.</p>
       <div class="table-scroll"><table><thead><tr><th scope="col">Select</th><th scope="col">Observation UTC</th><th scope="col">Release</th><th scope="col">Band range</th><th scope="col">Exposure ID</th><th scope="col">Compare / data</th></tr></thead><tbody id="records"><tr><td colspan="6" class="table-empty">Search a field to see its observation history.</td></tr></tbody></table></div>
     </section>
     <section class="science-note">

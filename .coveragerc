@@ -1,0 +1,15 @@
+[run]
+branch = True
+source = .
+omit =
+    test_*.py
+    tests/*
+    # SpaceLapse tools not changed on this branch
+    tools/build_tracks.py
+    tools/validate_targets.py
+
+[report]
+show_missing = True
+fail_under = 90
+exclude_also =
+    if __name__ == .__main__.:
